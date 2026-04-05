@@ -65,7 +65,7 @@ class AppTheme {
     colorSchemeSeed: _seed,
     brightness: Brightness.dark,
     useMaterial3: true,
-    scaffoldBackgroundColor: const Color(0xFF0F172A),
+    scaffoldBackgroundColor: Colors.black,
     appBarTheme: const AppBarTheme(
       centerTitle: true,
       elevation: 0,
@@ -76,18 +76,18 @@ class AppTheme {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
-      color: const Color(0xFF1E293B),
+      color: const Color(0xFF0D0D0D),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFF1E293B),
+      fillColor: const Color(0xFF0D0D0D),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade700),
+        borderSide: BorderSide(color: Colors.grey.shade800),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade700),
+        borderSide: BorderSide(color: Colors.grey.shade800),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -103,10 +103,10 @@ class AppTheme {
         ),
       ),
     ),
-    navigationBarTheme: NavigationBarThemeData(
+    navigationBarTheme: const NavigationBarThemeData(
       elevation: 0,
-      backgroundColor: const Color(0xFF1E293B),
-      indicatorColor: _seed.withValues(alpha: 0.2),
+      backgroundColor: Colors.transparent,
+      indicatorColor: Color(0xFF0D9488),
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(

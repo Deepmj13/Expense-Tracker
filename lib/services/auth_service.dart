@@ -16,6 +16,7 @@ class AuthService {
     required String name,
     required String email,
     required String password,
+    required Country country,
   }) async {
     final users = _dbService.usersBox();
     final exists =
@@ -27,6 +28,8 @@ class AuthService {
       name: name.trim(),
       email: email.trim().toLowerCase(),
       password: password,
+      country: country.name,
+      currencySymbol: country.currencySymbol,
     );
 
     await users.put(user.id, user.toMap());

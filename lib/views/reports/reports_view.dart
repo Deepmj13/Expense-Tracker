@@ -23,6 +23,7 @@ class ReportsView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(transactionsControllerProvider);
+    final currencySymbol = ref.watch(currencySymbolProvider);
     final expenseItems =
         items.where((e) => e.type == TransactionType.expense).toList();
     final incomeItems =
@@ -54,7 +55,7 @@ class ReportsView extends ConsumerWidget {
     }
 
     final currencyFormat =
-        NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+        NumberFormat.currency(symbol: currencySymbol, decimalDigits: 2);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),

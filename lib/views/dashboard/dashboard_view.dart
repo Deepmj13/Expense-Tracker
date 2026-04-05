@@ -12,13 +12,14 @@ class DashboardView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(transactionsControllerProvider);
     final service = ref.watch(transactionServiceProvider);
+    final currencySymbol = ref.watch(currencySymbolProvider);
     final income = service.incomeTotal(items);
     final expense = service.expenseTotal(items);
     final balance = income - expense;
 
     final recent = items.take(5).toList();
     final currencyFormat =
-        NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+        NumberFormat.currency(symbol: currencySymbol, decimalDigits: 2);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
@@ -209,13 +210,14 @@ class _BalanceIndicator extends StatelessWidget {
   }
 }
 
-class _RecentTransactionTile extends StatelessWidget {
+class _RecentTransactionTile extends ConsumerWidget {
   const _RecentTransactionTile({required this.item});
 
   final dynamic item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currencySymbol = ref.watch(currencySymbolProvider);
     final isIncome = item.type == TransactionType.income;
     final color = isIncome ? Colors.green : Colors.red;
 
@@ -261,7 +263,7 @@ class _RecentTransactionTile extends StatelessWidget {
             ),
           ),
           Text(
-            '${isIncome ? '+' : '-'}\$${item.amount.toStringAsFixed(2)}',
+            '${isIncome ? '+' : '-'}$currencySymbol${item.amount.toStringAsFixed(2)}',
             style: TextStyle(
               color: color,
               fontWeight: FontWeight.w700,

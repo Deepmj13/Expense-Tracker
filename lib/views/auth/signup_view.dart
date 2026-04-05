@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/validators.dart';
+import '../../models/app_user.dart';
 import '../../providers/app_providers.dart';
 
 class SignupView extends ConsumerStatefulWidget {
@@ -18,6 +19,7 @@ class _SignupViewState extends ConsumerState<SignupView> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  Country _selectedCountry = Country.countries.first;
   bool _loading = false;
 
   @override
@@ -33,7 +35,7 @@ class _SignupViewState extends ConsumerState<SignupView> {
     setState(() => _loading = true);
     final ok = await ref
         .read(authControllerProvider.notifier)
-        .signup(_name.text, _email.text, _password.text);
+        .signup(_name.text, _email.text, _password.text, _selectedCountry);
     if (mounted && !ok) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('User already exists')));
@@ -97,6 +99,26 @@ class _SignupViewState extends ConsumerState<SignupView> {
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<Country>(
+                  value: _selectedCountry,
+                  decoration: const InputDecoration(
+                    labelText: 'Country',
+                    prefixIcon: Icon(Icons.public),
+                  ),
+                  items: Country.countries.map((country) {
+                    return DropdownMenuItem(
+                      value: country,
+                      child:
+                          Text('${country.name} (${country.currencySymbol})'),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedCountry = value);
+                    }
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextFormField(

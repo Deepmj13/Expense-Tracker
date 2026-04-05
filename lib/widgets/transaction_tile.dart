@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../models/transaction_model.dart';
 import '../models/transaction_type.dart';
+import '../providers/app_providers.dart';
 
-class TransactionTile extends StatelessWidget {
+class TransactionTile extends ConsumerWidget {
   const TransactionTile({
     super.key,
     required this.item,
@@ -17,7 +19,8 @@ class TransactionTile extends StatelessWidget {
   final VoidCallback? onEdit;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currencySymbol = ref.watch(currencySymbolProvider);
     final isIncome = item.type == TransactionType.income;
     final color = isIncome ? Colors.green : Colors.red;
 
@@ -115,7 +118,7 @@ class TransactionTile extends StatelessWidget {
             ],
           ),
           trailing: Text(
-            '${isIncome ? '+' : '-'}\$${item.amount.toStringAsFixed(2)}',
+            '${isIncome ? '+' : '-'}$currencySymbol${item.amount.toStringAsFixed(2)}',
             style: TextStyle(
               color: color,
               fontWeight: FontWeight.w700,

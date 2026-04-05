@@ -9,11 +9,20 @@ import '../services/database_service.dart';
 import '../services/transaction_service.dart';
 
 final dbServiceProvider = Provider<DatabaseService>((_) => DatabaseService());
-final authServiceProvider = Provider<AuthService>((ref) => AuthService(ref.read(dbServiceProvider)));
-final transactionServiceProvider =
-    Provider<TransactionService>((ref) => TransactionService(ref.read(dbServiceProvider)));
+final authServiceProvider =
+    Provider<AuthService>((ref) => AuthService(ref.read(dbServiceProvider)));
+final transactionServiceProvider = Provider<TransactionService>(
+    (ref) => TransactionService(ref.read(dbServiceProvider)));
 
-final themeModeProvider = StateProvider<ThemeMode>((_) => ThemeMode.system);
+final themeModeProvider = StateProvider<ThemeMode>((ref) {
+  ref.watch(authControllerProvider);
+  return ThemeMode.system;
+});
+
+final currencySymbolProvider = Provider<String>((ref) {
+  final user = ref.watch(authControllerProvider);
+  return user?.currencySymbol ?? '₹';
+});
 
 class AuthController extends StateNotifier<AppUser?> {
   AuthController(this._authService) : super(null);
@@ -30,8 +39,10 @@ class AuthController extends StateNotifier<AppUser?> {
     return user != null;
   }
 
-  Future<bool> signup(String name, String email, String password) async {
-    final user = await _authService.signup(name: name, email: email, password: password);
+  Future<bool> signup(
+      String name, String email, String password, Country country) async {
+    final user = await _authService.signup(
+        name: name, email: email, password: password, country: country);
     state = user;
     return user != null;
   }
@@ -42,7 +53,8 @@ class AuthController extends StateNotifier<AppUser?> {
   }
 }
 
-final authControllerProvider = StateNotifierProvider<AuthController, AppUser?>((ref) {
+final authControllerProvider =
+    StateNotifierProvider<AuthController, AppUser?>((ref) {
   return AuthController(ref.read(authServiceProvider));
 });
 
@@ -104,20 +116,24 @@ class TransactionsController extends StateNotifier<List<TransactionModel>> {
 }
 
 final transactionsControllerProvider =
-    StateNotifierProvider<TransactionsController, List<TransactionModel>>((ref) {
+    StateNotifierProvider<TransactionsController, List<TransactionModel>>(
+        (ref) {
   return TransactionsController(ref.read(transactionServiceProvider));
 });
 
-final transactionFilterProvider = StateProvider<TransactionFilter>((_) => const TransactionFilter());
+final transactionFilterProvider =
+    StateProvider<TransactionFilter>((_) => const TransactionFilter());
 
 final filteredTransactionsProvider = Provider<List<TransactionModel>>((ref) {
   final items = ref.watch(transactionsControllerProvider);
   final filter = ref.watch(transactionFilterProvider);
 
   return items.where((item) {
-    final categoryMatch = filter.category == null || item.category == filter.category;
+    final categoryMatch =
+        filter.category == null || item.category == filter.category;
     final typeMatch = filter.type == null || item.type == filter.type;
-    final startMatch = filter.start == null || !item.date.isBefore(filter.start!);
+    final startMatch =
+        filter.start == null || !item.date.isBefore(filter.start!);
     final endMatch = filter.end == null || !item.date.isAfter(filter.end!);
     final searchMatch = filter.search.isEmpty ||
         item.title.toLowerCase().contains(filter.search.toLowerCase()) ||

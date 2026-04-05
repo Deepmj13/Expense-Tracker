@@ -87,56 +87,65 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             )
           : null,
       extendBody: true,
-      bottomNavigationBar: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            decoration: BoxDecoration(
-              color: colorScheme.surface.withValues(alpha: 0.85),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                width: 1,
-              ),
+      bottomNavigationBar: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
             ),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _NavItem(
-                      icon: Icons.home_outlined,
-                      activeIcon: Icons.home,
-                      label: 'Home',
-                      isSelected: _index == 0,
-                      onTap: () => setState(() => _index = 0),
-                    ),
-                    _NavItem(
-                      icon: Icons.receipt_long_outlined,
-                      activeIcon: Icons.receipt_long,
-                      label: 'Transactions',
-                      isSelected: _index == 1,
-                      onTap: () => setState(() => _index = 1),
-                    ),
-                    const SizedBox(width: 60),
-                    _NavItem(
-                      icon: Icons.bar_chart_outlined,
-                      activeIcon: Icons.bar_chart,
-                      label: 'Reports',
-                      isSelected: _index == 2,
-                      onTap: () => setState(() => _index = 2),
-                    ),
-                    _NavItem(
-                      icon: Icons.settings_outlined,
-                      activeIcon: Icons.settings,
-                      label: 'Settings',
-                      isSelected: _index == 3,
-                      onTap: () => setState(() => _index = 3),
-                    ),
-                  ],
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surface.withValues(alpha: 0.95),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _NavItem(
+                        icon: Icons.home_outlined,
+                        activeIcon: Icons.home,
+                        label: 'Home',
+                        isSelected: _index == 0,
+                        onTap: () => setState(() => _index = 0),
+                      ),
+                      _NavItem(
+                        icon: Icons.receipt_long_outlined,
+                        activeIcon: Icons.receipt_long,
+                        label: 'Transactions',
+                        isSelected: _index == 1,
+                        onTap: () => setState(() => _index = 1),
+                      ),
+                      _NavItem(
+                        icon: Icons.bar_chart_outlined,
+                        activeIcon: Icons.bar_chart,
+                        label: 'Reports',
+                        isSelected: _index == 2,
+                        onTap: () => setState(() => _index = 2),
+                      ),
+                      _NavItem(
+                        icon: Icons.settings_outlined,
+                        activeIcon: Icons.settings,
+                        label: 'Settings',
+                        isSelected: _index == 3,
+                        onTap: () => setState(() => _index = 3),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

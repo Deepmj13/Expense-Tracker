@@ -1,13 +1,73 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../providers/app_providers.dart';
 
 class SettingsView extends ConsumerWidget {
   const SettingsView({super.key});
+
+  String _getThemeTitle(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Light';
+      case ThemeMode.dark:
+        return 'Dark';
+      case ThemeMode.system:
+        return 'System';
+    }
+  }
+
+  IconData _getThemeIcon(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return Icons.light_mode;
+      case ThemeMode.dark:
+        return Icons.dark_mode;
+      case ThemeMode.system:
+        return Icons.settings_brightness;
+    }
+  }
+
+  Future<void> _reportBug(BuildContext context) async {
+    final Uri emailUri = Uri(
+      scheme: 'mailto',
+      path: 'deepmujpara@gmail.com',
+      queryParameters: {
+        'subject': 'Bug Report - Expense Tracker',
+        'body':
+            'Describe the bug:\n\n\n\nSteps to reproduce:\n1. \n2. \n3. \n\nExpected behavior:\n\nActual behavior:',
+      },
+    );
+
+    try {
+      if (await canLaunchUrl(emailUri)) {
+        await launchUrl(emailUri);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open email app'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,25 +90,25 @@ class SettingsView extends ConsumerWidget {
             color: Theme.of(context).cardTheme.color,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: SwitchListTile(
-            title: const Text('Dark Mode'),
-            subtitle: const Text('Toggle dark/light theme'),
-            secondary: Container(
+          child: ListTile(
+            leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
-                themeMode == ThemeMode.dark
-                    ? Icons.dark_mode
-                    : Icons.light_mode,
+                _getThemeIcon(themeMode),
                 color: Theme.of(context).colorScheme.onPrimaryContainer,
               ),
             ),
-            value: themeMode == ThemeMode.dark,
-            onChanged: (v) => ref.read(themeModeProvider.notifier).state =
-                v ? ThemeMode.dark : ThemeMode.light,
+            title: const Text('Theme'),
+            subtitle: Text(_getThemeTitle(themeMode)),
+            trailing: Switch(
+              value: themeMode == ThemeMode.dark,
+              onChanged: (v) => ref.read(themeModeProvider.notifier).state =
+                  v ? ThemeMode.dark : ThemeMode.light,
+            ),
           ),
         ),
         const SizedBox(height: 24),
@@ -69,7 +129,7 @@ class SettingsView extends ConsumerWidget {
               child: const Icon(Icons.file_download, color: Colors.green),
             ),
             title: const Text('Export Transactions'),
-            subtitle: const Text('Download as CSV file'),
+            subtitle: const Text('Save CSV file to your device'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () async {
               final transactions = ref.read(transactionsControllerProvider);
@@ -88,18 +148,59 @@ class SettingsView extends ConsumerWidget {
               ];
 
               final csv = const ListToCsvConverter().convert(rows);
-              final path = '${Directory.systemTemp.path}/expense_export.csv';
-              await File(path).writeAsString(csv);
+              final timestamp =
+                  DateTime.now().toIso8601String().replaceAll(':', '-');
+              final bytes = Uint8List.fromList(csv.codeUnits);
+
+              final result = await FilePicker.platform.saveFile(
+                dialogTitle: 'Choose save location',
+                fileName: 'expense_export_$timestamp.csv',
+                type: FileType.custom,
+                allowedExtensions: ['csv'],
+                bytes: bytes,
+              );
 
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('CSV exported to $path'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                if (result != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('CSV saved to: $result'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Export cancelled'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
               }
             },
+          ),
+        ),
+        const SizedBox(height: 24),
+        _SectionHeader(title: 'Help'),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardTheme.color,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.bug_report, color: Colors.orange),
+            ),
+            title: const Text('Report a Bug'),
+            subtitle: const Text('Send feedback to developer'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _reportBug(context),
           ),
         ),
         const SizedBox(height: 24),
