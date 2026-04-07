@@ -11,6 +11,7 @@ import '../services/auth_service.dart';
 import '../services/budget_service.dart';
 import '../services/database_service.dart';
 import '../services/transaction_service.dart';
+import '../services/sms_listener_service.dart';
 
 final dbServiceProvider = Provider<DatabaseService>((_) => DatabaseService());
 final authServiceProvider =
@@ -19,6 +20,9 @@ final transactionServiceProvider = Provider<TransactionService>(
     (ref) => TransactionService(ref.read(dbServiceProvider)));
 final budgetServiceProvider = Provider<BudgetService>(
     (ref) => BudgetService(ref.read(dbServiceProvider)));
+final smsListenerServiceProvider = Provider<SmsListenerService>((ref) {
+  return SmsListenerService(ref.read(transactionServiceProvider), ref);
+});
 
 final _secureStorage = const FlutterSecureStorage();
 
@@ -323,4 +327,31 @@ class BudgetAlertController extends StateNotifier<BudgetAlertLevel> {
 final budgetAlertControllerProvider =
     StateNotifierProvider<BudgetAlertController, BudgetAlertLevel>((ref) {
   return BudgetAlertController();
+});
+
+class SmsAutoImportNotifier extends StateNotifier<bool> {
+  SmsAutoImportNotifier() : super(false) {
+    _loadState();
+  }
+
+  static const _key = 'sms_auto_import_enabled';
+
+  Future<void> _loadState() async {
+    try {
+      final saved = await _secureStorage.read(key: _key);
+      state = saved == 'true';
+    } catch (_) {}
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = enabled;
+    try {
+      await _secureStorage.write(key: _key, value: enabled.toString());
+    } catch (_) {}
+  }
+}
+
+final smsAutoImportProvider =
+    StateNotifierProvider<SmsAutoImportNotifier, bool>((ref) {
+  return SmsAutoImportNotifier();
 });

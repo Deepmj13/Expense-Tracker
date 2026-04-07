@@ -47,12 +47,40 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     _initialized = true;
     ref.read(transactionsControllerProvider.notifier).load(widget.user.id);
     _checkBudgetAlerts();
+    _initSmsListener();
+  }
+
+  void _initSmsListener() async {
+    final isEnabled = ref.read(smsAutoImportProvider);
+    if (isEnabled) {
+      final smsService = ref.read(smsListenerServiceProvider);
+      await smsService.startListening(widget.user.id);
+    }
   }
 
   void _checkBudgetAlerts() {
     final alertLevel = ref.read(budgetAlertProvider);
     final alertController = ref.read(budgetAlertControllerProvider.notifier);
     alertController.checkAndUpdateAlert(alertLevel);
+  }
+
+  @override
+  void didUpdateWidget(HomeShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldEnabled = ref.read(smsAutoImportProvider);
+    final newEnabled = ref.watch(smsAutoImportProvider);
+    if (oldEnabled != newEnabled) {
+      _handleSmsToggleChange(newEnabled);
+    }
+  }
+
+  void _handleSmsToggleChange(bool enabled) async {
+    final smsService = ref.read(smsListenerServiceProvider);
+    if (enabled) {
+      await smsService.startListening(widget.user.id);
+    } else {
+      await smsService.stopListening();
+    }
   }
 
   void _showAddTransaction() async {

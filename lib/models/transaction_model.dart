@@ -62,6 +62,11 @@ enum PaymentMethod {
   }
 }
 
+enum TransactionSource {
+  manual,
+  smsAutoImport,
+}
+
 class TransactionModel {
   const TransactionModel({
     required this.id,
@@ -73,6 +78,7 @@ class TransactionModel {
     required this.note,
     this.isRecurring = false,
     this.paymentMethod = PaymentMethod.cash,
+    this.source = TransactionSource.manual,
   });
 
   final String id;
@@ -84,6 +90,7 @@ class TransactionModel {
   final String note;
   final bool isRecurring;
   final PaymentMethod paymentMethod;
+  final TransactionSource source;
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -95,6 +102,7 @@ class TransactionModel {
         'note': note,
         'isRecurring': isRecurring,
         'paymentMethod': paymentMethod.name,
+        'source': source.name,
       };
 
   factory TransactionModel.fromMap(Map<dynamic, dynamic> map) =>
@@ -113,6 +121,10 @@ class TransactionModel {
           (e) => e.name == (map['paymentMethod'] as String?),
           orElse: () => PaymentMethod.cash,
         ),
+        source: TransactionSource.values.firstWhere(
+          (e) => e.name == (map['source'] as String?),
+          orElse: () => TransactionSource.manual,
+        ),
       );
 
   TransactionModel copyWith({
@@ -125,6 +137,7 @@ class TransactionModel {
     String? note,
     bool? isRecurring,
     PaymentMethod? paymentMethod,
+    TransactionSource? source,
   }) {
     return TransactionModel(
       id: id ?? this.id,
@@ -136,6 +149,7 @@ class TransactionModel {
       note: note ?? this.note,
       isRecurring: isRecurring ?? this.isRecurring,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      source: source ?? this.source,
     );
   }
 }
