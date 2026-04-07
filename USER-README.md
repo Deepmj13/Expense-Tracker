@@ -9,6 +9,9 @@ A modern, offline-first expense tracking app built with Flutter. Track your inco
 - **Reports** - Visualize your spending with interactive charts (pie charts and bar graphs)
 - **Multi-Currency Support** - Choose your country and track expenses in your local currency
 - **Theme Settings** - Light, Dark, or follow system theme with pure black dark mode
+- **Accent Color** - Customize the app's accent color
+- **Budget System** - Set monthly budgets with spending alerts (50%, 90%, exceeded)
+- **Month Navigation** - View transactions and reports for any month
 - **Data Export** - Export your transactions as CSV to your device
 - **Bug Reporting** - Report issues directly to the developer
 - **Offline First** - All data is stored locally on your device
@@ -109,6 +112,22 @@ The Home tab shows:
 - Light mode uses clean white backgrounds
 - Dark mode uses pure black for OLED screens
 - Theme follows your device's system setting by default
+
+#### Accent Color
+1. Go to **Settings** > **Appearance**
+2. Tap **Accent Color**
+3. Choose from 8 preset colors
+4. The selected color applies throughout the app
+
+#### Budget System
+1. Go to **Settings** > **Budget**
+2. Tap **No Budget Set** (or existing budget)
+3. Enter your monthly budget amount
+4. The app tracks your spending and shows alerts when you reach:
+   - **50%** of budget - Warning banner
+   - **90%** - Alert banner
+   - **100%+** - Exceeded banner
+5. Swipe up on banners to dismiss them
 
 #### Data Export
 1. Go to **Settings** > **Data**

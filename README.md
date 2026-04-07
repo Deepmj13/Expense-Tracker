@@ -10,6 +10,8 @@
 - [Navigation](#navigation)
 - [Theming](#theming)
 - [Multi-Currency Support](#multi-currency-support)
+- [Budget System](#budget-system)
+- [Accent Color Customization](#accent-color-customization)
 
 ---
 
@@ -400,6 +402,133 @@ Country(
   currencySymbol: 'A\$',
 ),
 ```
+
+---
+
+## Budget System
+
+The app includes a monthly budget tracking system with spending alerts.
+
+### Budget Model (`models/budget_model.dart`)
+
+```dart
+class BudgetModel {
+  final String id;
+  final int month;
+  final int year;
+  final double amount;
+  final DateTime? createdAt;
+  
+  String get key => '$year-$month';
+}
+
+enum BudgetAlertLevel {
+  none,
+  fiftyPercent,
+  ninetyPercent,
+  exceeded,
+}
+```
+
+### Budget Service (`services/budget_service.dart`)
+
+```dart
+class BudgetService {
+  BudgetModel? getBudget(int month, int year);
+  Future<void> saveBudget(BudgetModel budget);
+  Future<void> deleteBudget(String key);
+  List<BudgetModel> getAllBudgets();
+}
+```
+
+### Budget Providers (`providers/app_providers.dart`)
+
+```dart
+final selectedMonthProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month);
+});
+
+final currentBudgetProvider = Provider<BudgetModel?>((ref) { ... });
+final monthlyExpensesProvider = Provider<double>((ref) { ... });
+final budgetProgressProvider = Provider<double>((ref) { ... });
+final budgetAlertProvider = Provider<BudgetAlertLevel>((ref) {
+  final progress = ref.watch(budgetProgressProvider);
+  if (progress >= 1.0) return BudgetAlertLevel.exceeded;
+  if (progress >= 0.9) return BudgetAlertLevel.ninetyPercent;
+  if (progress >= 0.5) return BudgetAlertLevel.fiftyPercent;
+  return BudgetAlertLevel.none;
+});
+```
+
+### Budget Alert Banner
+
+The `BudgetAlertBanner` widget in `views/budget/budget_settings_sheet.dart` displays:
+- **50% warning** (orange) - "You've used 50% of your monthly budget!"
+- **90% alert** (deep orange) - "You've used 90% of your monthly budget!"
+- **Exceeded** (red) - "You've exceeded your monthly budget!"
+
+### Budget Settings Sheet
+
+Users can set or update their monthly budget via a bottom sheet:
+- Located at `views/budget/budget_settings_sheet.dart`
+- Shows current month
+- Validates amount is positive
+
+---
+
+## Accent Color Customization
+
+Users can customize the app's accent color from 8 preset options.
+
+### Color Constants (`core/constants/app_constants.dart`)
+
+```dart
+class AppConstants {
+  static const int defaultAccentColor = 0xFF6366F1; // Indigo
+  static const Map<String, int> accentColors = {
+    'Red': 0xFFEF4444,
+    'Orange': 0xFFF97316,
+    'Yellow': 0xFFEAB308,
+    'Green': 0xFF22C55E,
+    'Teal': 0xFF14B8A6,
+    'Blue': 0xFF3B82F6,
+    'Indigo': 0xFF6366F1,
+    'Purple': 0xFFA855F7,
+  };
+}
+```
+
+### Accent Color Provider
+
+```dart
+final accentColorProvider =
+    StateNotifierProvider<AccentColorNotifier, Color>((ref) {
+  ref.watch(authControllerProvider);
+  ref.watch(dbServiceProvider);
+  return AccentColorNotifier();
+});
+
+class AccentColorNotifier extends StateNotifier<Color> {
+  AccentColorNotifier() : super(Color(AppConstants.defaultAccentColor));
+
+  @override
+  Color get state => Color(AppConstants.getAccentColor());
+
+  Future<void> setAccentColor(Color color) async {
+    state = color;
+    await AppConstants.setAccentColor(color.toARGB32());
+  }
+}
+```
+
+### Settings Integration
+
+The color picker is available in `views/settings/settings_view.dart`:
+1. Settings > Appearance > Accent Color
+2. Shows grid of 8 color options
+3. Selected color shows checkmark and glow effect
+4. Persisted using secure storage
 
 ---
 
