@@ -5,8 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'core/themes/app_theme.dart';
 import 'providers/app_providers.dart';
 import 'services/database_service.dart';
-import 'views/auth/login_view.dart';
-import 'views/auth/signup_view.dart';
+import 'views/auth/auth_wrapper.dart';
 import 'views/home_shell.dart';
 
 Future<void> main() async {
@@ -22,7 +21,7 @@ final _routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/auth',
-        builder: (_, __) => const _AuthWrapper(),
+        builder: (_, __) => const AuthWrapper(),
       ),
       GoRoute(
         path: '/home',
@@ -37,24 +36,6 @@ final _routerProvider = Provider<GoRouter>((ref) {
     },
   );
 });
-
-class _AuthWrapper extends ConsumerStatefulWidget {
-  const _AuthWrapper();
-
-  @override
-  ConsumerState<_AuthWrapper> createState() => _AuthWrapperState();
-}
-
-class _AuthWrapperState extends ConsumerState<_AuthWrapper> {
-  bool _showSignup = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return _showSignup
-        ? SignupView(onLoginTap: () => setState(() => _showSignup = false))
-        : LoginView(onSignupTap: () => setState(() => _showSignup = true));
-  }
-}
 
 class ExpenseTrackerApp extends ConsumerStatefulWidget {
   const ExpenseTrackerApp({super.key});
@@ -73,13 +54,14 @@ class _ExpenseTrackerAppState extends ConsumerState<ExpenseTrackerApp> {
   @override
   Widget build(BuildContext context) {
     final mode = ref.watch(themeModeProvider);
+    final accentColor = ref.watch(accentColorProvider);
     final router = ref.watch(_routerProvider);
 
     return MaterialApp.router(
       title: 'Expense Tracker',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      theme: AppTheme.light(accentColor),
+      darkTheme: AppTheme.dark(accentColor),
       themeMode: mode,
       routerConfig: router,
     );

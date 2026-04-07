@@ -103,7 +103,7 @@ class TransactionsView extends ConsumerWidget {
                       items: [
                         const DropdownMenuItem<String?>(
                             value: null, child: Text('All')),
-                        ...AppConstants.categories.map(
+                        ...AppConstants.allCategories.map(
                           (e) => DropdownMenuItem<String?>(
                               value: e, child: Text(e)),
                         ),

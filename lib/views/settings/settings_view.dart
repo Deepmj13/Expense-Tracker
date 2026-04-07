@@ -5,10 +5,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../providers/app_providers.dart';
 import '../budget/budget_settings_sheet.dart';
+import 'feedback_sheet.dart';
 
 class SettingsView extends ConsumerWidget {
   const SettingsView({super.key});
@@ -35,45 +36,113 @@ class SettingsView extends ConsumerWidget {
     }
   }
 
-  Future<void> _reportBug(BuildContext context) async {
-    final Uri emailUri = Uri(
-      scheme: 'mailto',
-      path: 'deepmujpara@gmail.com',
-      queryParameters: {
-        'subject': 'Bug Report - Expense Tracker',
-        'body':
-            'Describe the bug:\n\n\n\nSteps to reproduce:\n1. \n2. \n3. \n\nExpected behavior:\n\nActual behavior:',
-      },
+  void _showFeedbackDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const FeedbackSheet(),
     );
+  }
 
-    try {
-      if (await canLaunchUrl(emailUri)) {
-        await launchUrl(emailUri);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not open email app'),
-              behavior: SnackBarBehavior.floating,
+  void _showColorPicker(BuildContext context, WidgetRef ref) {
+    final currentColor = ref.read(accentColorProvider);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
             ),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
+            const SizedBox(height: 20),
+            Text(
+              'Choose Accent Color',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Select a color that suits your style',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              alignment: WrapAlignment.center,
+              children: AppConstants.accentColors.entries.map((entry) {
+                final color = Color(entry.value);
+                final isSelected = currentColor.toARGB32() == color.toARGB32();
+                return GestureDetector(
+                  onTap: () {
+                    ref
+                        .read(accentColorProvider.notifier)
+                        .setAccentColor(color);
+                    Navigator.pop(context);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: isSelected
+                          ? Border.all(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              width: 3,
+                            )
+                          : null,
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: color.withValues(alpha: 0.5),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check, color: Colors.white, size: 28)
+                        : null,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
+    final accentColor = ref.watch(accentColorProvider);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
@@ -92,26 +161,59 @@ class SettingsView extends ConsumerWidget {
             color: Theme.of(context).cardTheme.color,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(8),
+          child: Column(
+            children: [
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    _getThemeIcon(themeMode),
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                title: const Text('Theme'),
+                subtitle: Text(_getThemeTitle(themeMode)),
+                trailing: Switch(
+                  value: themeMode == ThemeMode.dark,
+                  onChanged: (v) => ref
+                      .read(themeModeProvider.notifier)
+                      .setThemeMode(v ? ThemeMode.dark : ThemeMode.light),
+                ),
               ),
-              child: Icon(
-                _getThemeIcon(themeMode),
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              const Divider(height: 1, indent: 72),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.palette,
+                    color: accentColor,
+                  ),
+                ),
+                title: const Text('Accent Color'),
+                subtitle: const Text('Customize app color'),
+                trailing: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: accentColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                onTap: () => _showColorPicker(context, ref),
               ),
-            ),
-            title: const Text('Theme'),
-            subtitle: Text(_getThemeTitle(themeMode)),
-            trailing: Switch(
-              value: themeMode == ThemeMode.dark,
-              onChanged: (v) => ref
-                  .read(themeModeProvider.notifier)
-                  .setThemeMode(v ? ThemeMode.dark : ThemeMode.light),
-            ),
+            ],
           ),
         ),
         const SizedBox(height: 24),
@@ -202,12 +304,12 @@ class SettingsView extends ConsumerWidget {
                 color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.bug_report, color: Colors.orange),
+              child: const Icon(Icons.feedback, color: Colors.orange),
             ),
-            title: const Text('Report a Bug'),
-            subtitle: const Text('Send feedback to developer'),
+            title: const Text('Send Feedback'),
+            subtitle: const Text('Report bugs or suggest features'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _reportBug(context),
+            onTap: () => _showFeedbackDialog(context),
           ),
         ),
         const SizedBox(height: 24),

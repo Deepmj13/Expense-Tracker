@@ -141,28 +141,6 @@ class TransactionTile extends ConsumerWidget {
     final isIncome = item.type == TransactionType.income;
     final color = isIncome ? Colors.green : Colors.red;
 
-    String paymentMethodLabel;
-    switch (item.paymentMethod) {
-      case PaymentMethod.cash:
-        paymentMethodLabel = 'Cash';
-        break;
-      case PaymentMethod.creditCard:
-        paymentMethodLabel = 'Credit Card';
-        break;
-      case PaymentMethod.debitCard:
-        paymentMethodLabel = 'Debit Card';
-        break;
-      case PaymentMethod.bankTransfer:
-        paymentMethodLabel = 'Bank Transfer';
-        break;
-      case PaymentMethod.upi:
-        paymentMethodLabel = 'UPI';
-        break;
-      case PaymentMethod.other:
-        paymentMethodLabel = 'Other';
-        break;
-    }
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -305,9 +283,9 @@ class TransactionTile extends ConsumerWidget {
               value: DateFormat.yMMMMd().format(item.date),
             ),
             _DetailRow(
-              icon: Icons.payment,
+              icon: item.paymentMethod.icon,
               label: 'Payment Method',
-              value: paymentMethodLabel,
+              value: item.paymentMethod.label,
             ),
             if (item.isRecurring)
               _DetailRow(

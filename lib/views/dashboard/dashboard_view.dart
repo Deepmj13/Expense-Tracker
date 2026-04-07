@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -6,11 +8,41 @@ import '../../models/transaction_type.dart';
 import '../../providers/app_providers.dart';
 import '../budget/budget_settings_sheet.dart';
 
-class DashboardView extends ConsumerWidget {
+const _greetingEmojis = [
+  '👋',
+  '✨',
+  '🎉',
+  '💰',
+  '📊',
+  '🚀',
+  '💫',
+  '🌟',
+  '🙌',
+  '🎯'
+];
+
+String _getRandomEmoji() {
+  return _greetingEmojis[Random().nextInt(_greetingEmojis.length)];
+}
+
+class DashboardView extends ConsumerStatefulWidget {
   const DashboardView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardView> createState() => _DashboardViewState();
+}
+
+class _DashboardViewState extends ConsumerState<DashboardView> {
+  late final String _emoji;
+
+  @override
+  void initState() {
+    super.initState();
+    _emoji = _getRandomEmoji();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final items = ref.watch(transactionsControllerProvider);
     final service = ref.watch(transactionServiceProvider);
     final currencySymbol = ref.watch(currencySymbolProvider);
@@ -38,57 +70,71 @@ class DashboardView extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$greeting,',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        '$greeting,',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                       ),
-                ),
-                Text(
-                  userName,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(width: 6),
+                      Text(
+                        _emoji,
+                        style: const TextStyle(fontSize: 24),
                       ),
-                ),
-                const SizedBox(height: 4),
-                InkWell(
-                  onTap: () => _showMonthPicker(context, ref),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          DateFormat.yMMMM().format(selectedMonth),
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onPrimaryContainer,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                    ],
+                  ),
+                  Text(
+                    userName,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.arrow_drop_down,
-                          size: 18,
-                          color:
-                              Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
-                      ],
+                  ),
+                  const SizedBox(height: 4),
+                  InkWell(
+                    onTap: () => _showMonthPicker(context, ref),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            DateFormat.yMMMM().format(selectedMonth),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_drop_down,
+                            size: 18,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onPrimaryContainer,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             IconButton(
               onPressed: () => _showAddBudget(context, ref, budget?.amount),
@@ -278,6 +324,7 @@ class DashboardView extends ConsumerWidget {
     );
     if (result != null) {
       ref.read(budgetAlertControllerProvider.notifier).resetForNewMonth();
+      ref.invalidate(currentBudgetProvider);
     }
   }
 }

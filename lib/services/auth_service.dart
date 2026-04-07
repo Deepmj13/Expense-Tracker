@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../core/utils/password_utils.dart';
 import '../models/app_user.dart';
 import 'database_service.dart';
 
@@ -23,11 +24,13 @@ class AuthService {
         users.values.any((u) => u['email'] == email.trim().toLowerCase());
     if (exists) return null;
 
+    final hashedPassword = PasswordUtils.hash(password);
+
     final user = AppUser(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: name.trim(),
       email: email.trim().toLowerCase(),
-      password: password,
+      password: hashedPassword,
       country: country.name,
       currencySymbol: country.currencySymbol,
     );
@@ -41,16 +44,20 @@ class AuthService {
   Future<AppUser?> login(
       {required String email, required String password}) async {
     final users = _dbService.usersBox();
-    final match = users.values.where((u) {
-      return u['email'] == email.trim().toLowerCase() &&
-          u['password'] == password;
-    });
 
-    if (match.isEmpty) return null;
-    final user = AppUser.fromMap(match.first);
-    await _secureStorage.write(
-        key: _sessionKey, value: jsonEncode(user.toMap()));
-    return user;
+    for (final userData in users.values) {
+      if (userData['email'] == email.trim().toLowerCase()) {
+        final storedHash = userData['password'] as String;
+        if (PasswordUtils.verify(password, storedHash)) {
+          final user = AppUser.fromMap(userData);
+          await _secureStorage.write(
+              key: _sessionKey, value: jsonEncode(user.toMap()));
+          return user;
+        }
+        return null;
+      }
+    }
+    return null;
   }
 
   Future<AppUser?> getCurrentUser() async {

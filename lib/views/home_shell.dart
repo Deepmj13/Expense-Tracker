@@ -25,6 +25,7 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
+  bool _initialized = false;
 
   final _pages = const [
     DashboardView(),
@@ -37,11 +38,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(transactionsControllerProvider.notifier).load(widget.user.id);
+      _initialize();
     });
   }
 
-  void _checkBudgetAlerts(WidgetRef ref) {
+  void _initialize() {
+    if (_initialized) return;
+    _initialized = true;
+    ref.read(transactionsControllerProvider.notifier).load(widget.user.id);
+    _checkBudgetAlerts();
+  }
+
+  void _checkBudgetAlerts() {
     final alertLevel = ref.read(budgetAlertProvider);
     final alertController = ref.read(budgetAlertControllerProvider.notifier);
     alertController.checkAndUpdateAlert(alertLevel);
@@ -60,9 +68,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _checkBudgetAlerts(ref));
-
     final colorScheme = Theme.of(context).colorScheme;
     final showFab = _index == 0;
     final alertLevel = ref.watch(budgetAlertProvider);

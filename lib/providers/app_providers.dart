@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../core/constants/app_constants.dart';
 import '../models/app_user.dart';
 import '../models/budget_model.dart';
 import '../models/transaction_model.dart';
@@ -26,6 +27,25 @@ final themeModeProvider =
   ref.watch(authControllerProvider);
   return ThemeModeNotifier();
 });
+
+final accentColorProvider =
+    StateNotifierProvider<AccentColorNotifier, Color>((ref) {
+  ref.watch(authControllerProvider);
+  ref.watch(dbServiceProvider);
+  return AccentColorNotifier();
+});
+
+class AccentColorNotifier extends StateNotifier<Color> {
+  AccentColorNotifier() : super(Color(AppConstants.defaultAccentColor));
+
+  @override
+  Color get state => Color(AppConstants.getAccentColor());
+
+  Future<void> setAccentColor(Color color) async {
+    state = color;
+    await AppConstants.setAccentColor(color.toARGB32());
+  }
+}
 
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   ThemeModeNotifier() : super(ThemeMode.system) {
@@ -191,6 +211,7 @@ final selectedMonthProvider = StateProvider<DateTime>((ref) {
 });
 
 final currentBudgetProvider = Provider<BudgetModel?>((ref) {
+  ref.watch(budgetControllerProvider);
   final service = ref.watch(budgetServiceProvider);
   final selectedMonth = ref.watch(selectedMonthProvider);
   return service.getBudget(selectedMonth.month, selectedMonth.year);

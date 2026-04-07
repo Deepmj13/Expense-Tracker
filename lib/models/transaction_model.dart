@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 import 'transaction_type.dart';
 
 enum PaymentMethod {
@@ -6,7 +8,58 @@ enum PaymentMethod {
   debitCard,
   bankTransfer,
   upi,
-  other,
+  other;
+
+  String get label {
+    switch (this) {
+      case PaymentMethod.cash:
+        return 'Cash';
+      case PaymentMethod.creditCard:
+        return 'Credit Card';
+      case PaymentMethod.debitCard:
+        return 'Debit Card';
+      case PaymentMethod.bankTransfer:
+        return 'Bank Transfer';
+      case PaymentMethod.upi:
+        return 'UPI';
+      case PaymentMethod.other:
+        return 'Other';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case PaymentMethod.cash:
+        return Icons.wallet;
+      case PaymentMethod.creditCard:
+        return Icons.credit_card;
+      case PaymentMethod.debitCard:
+        return Icons.account_balance;
+      case PaymentMethod.bankTransfer:
+        return Icons.account_balance_wallet;
+      case PaymentMethod.upi:
+        return Icons.phone_android;
+      case PaymentMethod.other:
+        return Icons.more_horiz;
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case PaymentMethod.cash:
+        return const Color(0xFF10B981);
+      case PaymentMethod.creditCard:
+        return const Color(0xFF3B82F6);
+      case PaymentMethod.debitCard:
+        return const Color(0xFF8B5CF6);
+      case PaymentMethod.bankTransfer:
+        return const Color(0xFFF97316);
+      case PaymentMethod.upi:
+        return const Color(0xFFEC4899);
+      case PaymentMethod.other:
+        return const Color(0xFF6B7280);
+    }
+  }
 }
 
 class TransactionModel {

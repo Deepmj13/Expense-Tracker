@@ -37,7 +37,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
     _note = TextEditingController(text: i?.note ?? '');
     _customCategory = TextEditingController(text: '');
     _type = i?.type ?? TransactionType.expense;
-    final categories = AppConstants.categories;
+    final categories = AppConstants.allCategories;
     _useCustomCategory = i != null && !categories.contains(i.category);
     _category =
         _useCustomCategory ? i!.category : (i?.category ?? categories.first);
@@ -91,7 +91,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final categories = AppConstants.categories;
+    final categories = AppConstants.allCategories;
 
     return Container(
       decoration: BoxDecoration(
@@ -236,30 +236,12 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                     labelText: 'Payment Method',
                     prefixIcon: Icon(Icons.payment),
                   ),
-                  items: PaymentMethod.values.map((e) {
-                    String label;
-                    switch (e) {
-                      case PaymentMethod.cash:
-                        label = 'Cash';
-                        break;
-                      case PaymentMethod.creditCard:
-                        label = 'Credit Card';
-                        break;
-                      case PaymentMethod.debitCard:
-                        label = 'Debit Card';
-                        break;
-                      case PaymentMethod.bankTransfer:
-                        label = 'Bank Transfer';
-                        break;
-                      case PaymentMethod.upi:
-                        label = 'UPI';
-                        break;
-                      case PaymentMethod.other:
-                        label = 'Other';
-                        break;
-                    }
-                    return DropdownMenuItem(value: e, child: Text(label));
-                  }).toList(),
+                  items: PaymentMethod.values
+                      .map((e) => DropdownMenuItem(
+                            value: e,
+                            child: Text(e.label),
+                          ))
+                      .toList(),
                   onChanged: (v) => setState(() => _paymentMethod = v!),
                 ),
                 const SizedBox(height: 16),
