@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../models/app_user.dart';
+import '../models/budget_model.dart';
 import '../models/transaction_model.dart';
 import '../models/transaction_type.dart';
 import '../services/auth_service.dart';
+import '../services/budget_service.dart';
 import '../services/database_service.dart';
 import '../services/transaction_service.dart';
 
@@ -13,11 +16,43 @@ final authServiceProvider =
     Provider<AuthService>((ref) => AuthService(ref.read(dbServiceProvider)));
 final transactionServiceProvider = Provider<TransactionService>(
     (ref) => TransactionService(ref.read(dbServiceProvider)));
+final budgetServiceProvider = Provider<BudgetService>(
+    (ref) => BudgetService(ref.read(dbServiceProvider)));
 
-final themeModeProvider = StateProvider<ThemeMode>((ref) {
+final _secureStorage = const FlutterSecureStorage();
+
+final themeModeProvider =
+    StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
   ref.watch(authControllerProvider);
-  return ThemeMode.system;
+  return ThemeModeNotifier();
 });
+
+class ThemeModeNotifier extends StateNotifier<ThemeMode> {
+  ThemeModeNotifier() : super(ThemeMode.system) {
+    _loadThemeMode();
+  }
+
+  static const _key = 'theme_mode';
+
+  Future<void> _loadThemeMode() async {
+    try {
+      final saved = await _secureStorage.read(key: _key);
+      if (saved != null) {
+        state = ThemeMode.values.firstWhere(
+          (m) => m.name == saved,
+          orElse: () => ThemeMode.system,
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    state = mode;
+    try {
+      await _secureStorage.write(key: _key, value: mode.name);
+    } catch (_) {}
+  }
+}
 
 final currencySymbolProvider = Provider<String>((ref) {
   final user = ref.watch(authControllerProvider);
@@ -127,8 +162,11 @@ final transactionFilterProvider =
 final filteredTransactionsProvider = Provider<List<TransactionModel>>((ref) {
   final items = ref.watch(transactionsControllerProvider);
   final filter = ref.watch(transactionFilterProvider);
+  final selectedMonth = ref.watch(selectedMonthProvider);
 
   return items.where((item) {
+    final monthMatch = item.date.year == selectedMonth.year &&
+        item.date.month == selectedMonth.month;
     final categoryMatch =
         filter.category == null || item.category == filter.category;
     final typeMatch = filter.type == null || item.type == filter.type;
@@ -138,6 +176,130 @@ final filteredTransactionsProvider = Provider<List<TransactionModel>>((ref) {
     final searchMatch = filter.search.isEmpty ||
         item.title.toLowerCase().contains(filter.search.toLowerCase()) ||
         item.note.toLowerCase().contains(filter.search.toLowerCase());
-    return categoryMatch && typeMatch && startMatch && endMatch && searchMatch;
+    return monthMatch &&
+        categoryMatch &&
+        typeMatch &&
+        startMatch &&
+        endMatch &&
+        searchMatch;
   }).toList();
+});
+
+final selectedMonthProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month);
+});
+
+final currentBudgetProvider = Provider<BudgetModel?>((ref) {
+  final service = ref.watch(budgetServiceProvider);
+  final selectedMonth = ref.watch(selectedMonthProvider);
+  return service.getBudget(selectedMonth.month, selectedMonth.year);
+});
+
+final monthlyExpensesProvider = Provider<double>((ref) {
+  final items = ref.watch(transactionsControllerProvider);
+  final selectedMonth = ref.watch(selectedMonthProvider);
+  return items
+      .where((t) =>
+          t.type == TransactionType.expense &&
+          t.date.year == selectedMonth.year &&
+          t.date.month == selectedMonth.month)
+      .fold(0.0, (sum, t) => sum + t.amount);
+});
+
+final monthlyIncomeProvider = Provider<double>((ref) {
+  final items = ref.watch(transactionsControllerProvider);
+  final selectedMonth = ref.watch(selectedMonthProvider);
+  return items
+      .where((t) =>
+          t.type == TransactionType.income &&
+          t.date.year == selectedMonth.year &&
+          t.date.month == selectedMonth.month)
+      .fold(0.0, (sum, t) => sum + t.amount);
+});
+
+final budgetProgressProvider = Provider<double>((ref) {
+  final budget = ref.watch(currentBudgetProvider);
+  final expenses = ref.watch(monthlyExpensesProvider);
+  if (budget == null || budget.amount == 0) return 0;
+  return (expenses / budget.amount).clamp(0.0, 2.0);
+});
+
+final budgetAlertProvider = Provider<BudgetAlertLevel>((ref) {
+  final progress = ref.watch(budgetProgressProvider);
+  if (progress >= 1.0) return BudgetAlertLevel.exceeded;
+  if (progress >= 0.9) return BudgetAlertLevel.ninetyPercent;
+  if (progress >= 0.5) return BudgetAlertLevel.fiftyPercent;
+  return BudgetAlertLevel.none;
+});
+
+final budgetRemainingProvider = Provider<double>((ref) {
+  final budget = ref.watch(currentBudgetProvider);
+  final expenses = ref.watch(monthlyExpensesProvider);
+  if (budget == null) return 0;
+  return budget.amount - expenses;
+});
+
+class BudgetController extends StateNotifier<BudgetModel?> {
+  BudgetController(this._service, this._month)
+      : super(_service.getBudget(_month.month, _month.year));
+
+  final BudgetService _service;
+  final DateTime _month;
+
+  Future<void> save(double amount) async {
+    final budget = BudgetModel(
+      id: '${_month.year}-${_month.month}-${DateTime.now().millisecondsSinceEpoch}',
+      month: _month.month,
+      year: _month.year,
+      amount: amount,
+      createdAt: DateTime.now(),
+    );
+    await _service.saveBudget(budget);
+    state = budget;
+  }
+
+  Future<void> delete() async {
+    await _service.deleteBudget('${_month.year}-${_month.month}');
+    state = null;
+  }
+
+  void refresh() {
+    state = _service.getBudget(_month.month, _month.year);
+  }
+}
+
+final budgetControllerProvider =
+    StateNotifierProvider<BudgetController, BudgetModel?>((ref) {
+  final service = ref.watch(budgetServiceProvider);
+  final selectedMonth = ref.watch(selectedMonthProvider);
+  return BudgetController(service, selectedMonth);
+});
+
+class BudgetAlertController extends StateNotifier<BudgetAlertLevel> {
+  BudgetAlertController() : super(BudgetAlertLevel.none);
+
+  BudgetAlertLevel? _lastAlert;
+
+  void checkAndUpdateAlert(BudgetAlertLevel newLevel) {
+    if (newLevel != _lastAlert && newLevel != BudgetAlertLevel.none) {
+      _lastAlert = newLevel;
+      state = newLevel;
+    }
+  }
+
+  void dismissAlert() {
+    _lastAlert = BudgetAlertLevel.none;
+    state = BudgetAlertLevel.none;
+  }
+
+  void resetForNewMonth() {
+    _lastAlert = BudgetAlertLevel.none;
+    state = BudgetAlertLevel.none;
+  }
+}
+
+final budgetAlertControllerProvider =
+    StateNotifierProvider<BudgetAlertController, BudgetAlertLevel>((ref) {
+  return BudgetAlertController();
 });

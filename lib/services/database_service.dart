@@ -5,16 +5,21 @@ class DatabaseService {
   static const transactionsBoxName = 'transactions_box';
   static const appBoxName = 'app_box';
 
+  Box<Map>? _usersBox;
+  Box<Map>? _transactionsBox;
+  Box<dynamic>? _appBox;
+
   Future<void> init() async {
     await Hive.initFlutter();
-    await Hive.openBox<Map>(usersBoxName);
-    await Hive.openBox<Map>(transactionsBoxName);
-    await Hive.openBox(appBoxName);
+    _usersBox = await Hive.openBox<Map>(usersBoxName);
+    _transactionsBox = await Hive.openBox<Map>(transactionsBoxName);
+    _appBox = await Hive.openBox(appBoxName);
   }
 
-  Box<Map> usersBox() => Hive.box<Map>(usersBoxName);
+  Box<Map> usersBox() => _usersBox ?? Hive.box<Map>(usersBoxName);
 
-  Box<Map> transactionsBox() => Hive.box<Map>(transactionsBoxName);
+  Box<Map> transactionsBox() =>
+      _transactionsBox ?? Hive.box<Map>(transactionsBoxName);
 
-  Box appBox() => Hive.box(appBoxName);
+  Box<dynamic> appBox() => _appBox ?? Hive.box(appBoxName);
 }

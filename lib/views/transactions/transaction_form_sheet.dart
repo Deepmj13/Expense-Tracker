@@ -26,6 +26,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
   late DateTime _date;
   bool _recurring = false;
   bool _useCustomCategory = false;
+  late PaymentMethod _paymentMethod;
 
   @override
   void initState() {
@@ -36,16 +37,16 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
     _note = TextEditingController(text: i?.note ?? '');
     _customCategory = TextEditingController(text: '');
     _type = i?.type ?? TransactionType.expense;
-    final defaultCategories = AppConstants.categories;
-    _useCustomCategory = i != null && !defaultCategories.contains(i.category);
-    _category = _useCustomCategory
-        ? i!.category
-        : (i?.category ?? defaultCategories.first);
+    final categories = AppConstants.categories;
+    _useCustomCategory = i != null && !categories.contains(i.category);
+    _category =
+        _useCustomCategory ? i!.category : (i?.category ?? categories.first);
     if (_useCustomCategory) {
       _customCategory.text = _category;
     }
     _date = i?.date ?? DateTime.now();
     _recurring = i?.isRecurring ?? false;
+    _paymentMethod = i?.paymentMethod ?? PaymentMethod.cash;
   }
 
   @override
@@ -57,7 +58,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     final categoryToSave =
         _useCustomCategory ? _customCategory.text.trim() : _category;
@@ -67,6 +68,11 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
       );
       return;
     }
+
+    if (_useCustomCategory && _customCategory.text.trim().isNotEmpty) {
+      await AppConstants.addCustomCategory(_customCategory.text.trim());
+    }
+
     final model = TransactionModel(
       id: widget.initial?.id ??
           DateTime.now().microsecondsSinceEpoch.toString(),
@@ -77,13 +83,15 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
       date: _date,
       note: _note.text.trim(),
       isRecurring: _recurring,
+      paymentMethod: _paymentMethod,
     );
-    Navigator.pop(context, model);
+    if (mounted) Navigator.pop(context, model);
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final categories = AppConstants.categories;
 
     return Container(
       decoration: BoxDecoration(
@@ -150,7 +158,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<TransactionType>(
-                        initialValue: _type,
+                        value: _type,
                         decoration: const InputDecoration(
                           labelText: 'Type',
                         ),
@@ -163,44 +171,40 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          DropdownButtonFormField<String>(
-                            initialValue:
-                                _useCustomCategory ? 'Custom' : _category,
-                            decoration: const InputDecoration(
-                              labelText: 'Category',
+                      child: DropdownButtonFormField<String>(
+                        value: _useCustomCategory
+                            ? _customCategory.text.isEmpty
+                                ? 'Custom'
+                                : _category
+                            : _category,
+                        decoration: const InputDecoration(
+                          labelText: 'Category',
+                        ),
+                        items: [
+                          ...categories.map(
+                            (e) => DropdownMenuItem(value: e, child: Text(e)),
+                          ),
+                          const DropdownMenuItem(
+                            value: 'Custom',
+                            child: Row(
+                              children: [
+                                Icon(Icons.add, size: 18),
+                                SizedBox(width: 8),
+                                Text('Custom'),
+                              ],
                             ),
-                            items: [
-                              ...AppConstants.categories.map(
-                                (e) =>
-                                    DropdownMenuItem(value: e, child: Text(e)),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'Custom',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.add, size: 18),
-                                    SizedBox(width: 8),
-                                    Text('Custom'),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            onChanged: (v) {
-                              setState(() {
-                                if (v == 'Custom') {
-                                  _useCustomCategory = true;
-                                } else {
-                                  _useCustomCategory = false;
-                                  _category =
-                                      v ?? AppConstants.categories.first;
-                                }
-                              });
-                            },
                           ),
                         ],
+                        onChanged: (v) {
+                          setState(() {
+                            if (v == 'Custom') {
+                              _useCustomCategory = true;
+                            } else {
+                              _useCustomCategory = false;
+                              _category = v ?? categories.first;
+                            }
+                          });
+                        },
                       ),
                     ),
                   ],
@@ -225,6 +229,39 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 16),
+                DropdownButtonFormField<PaymentMethod>(
+                  value: _paymentMethod,
+                  decoration: const InputDecoration(
+                    labelText: 'Payment Method',
+                    prefixIcon: Icon(Icons.payment),
+                  ),
+                  items: PaymentMethod.values.map((e) {
+                    String label;
+                    switch (e) {
+                      case PaymentMethod.cash:
+                        label = 'Cash';
+                        break;
+                      case PaymentMethod.creditCard:
+                        label = 'Credit Card';
+                        break;
+                      case PaymentMethod.debitCard:
+                        label = 'Debit Card';
+                        break;
+                      case PaymentMethod.bankTransfer:
+                        label = 'Bank Transfer';
+                        break;
+                      case PaymentMethod.upi:
+                        label = 'UPI';
+                        break;
+                      case PaymentMethod.other:
+                        label = 'Other';
+                        break;
+                    }
+                    return DropdownMenuItem(value: e, child: Text(label));
+                  }).toList(),
+                  onChanged: (v) => setState(() => _paymentMethod = v!),
+                ),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(16),

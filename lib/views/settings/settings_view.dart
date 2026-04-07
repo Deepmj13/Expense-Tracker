@@ -4,9 +4,11 @@ import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../providers/app_providers.dart';
+import '../budget/budget_settings_sheet.dart';
 
 class SettingsView extends ConsumerWidget {
   const SettingsView({super.key});
@@ -106,11 +108,16 @@ class SettingsView extends ConsumerWidget {
             subtitle: Text(_getThemeTitle(themeMode)),
             trailing: Switch(
               value: themeMode == ThemeMode.dark,
-              onChanged: (v) => ref.read(themeModeProvider.notifier).state =
-                  v ? ThemeMode.dark : ThemeMode.light,
+              onChanged: (v) => ref
+                  .read(themeModeProvider.notifier)
+                  .setThemeMode(v ? ThemeMode.dark : ThemeMode.light),
             ),
           ),
         ),
+        const SizedBox(height: 24),
+        _SectionHeader(title: 'Budget'),
+        const SizedBox(height: 12),
+        _BudgetManagementCard(ref: ref),
         const SizedBox(height: 24),
         _SectionHeader(title: 'Data'),
         const SizedBox(height: 12),
@@ -253,6 +260,136 @@ class _SectionHeader extends StatelessWidget {
             fontWeight: FontWeight.w600,
             color: Theme.of(context).colorScheme.primary,
           ),
+    );
+  }
+}
+
+class _BudgetManagementCard extends ConsumerWidget {
+  const _BudgetManagementCard({required this.ref});
+
+  final WidgetRef ref;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final budget = ref.watch(currentBudgetProvider);
+    final currencySymbol = ref.watch(currencySymbolProvider);
+    final selectedMonth = ref.watch(selectedMonthProvider);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.account_balance_wallet,
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            title: Text(
+              budget != null
+                  ? 'Budget for ${DateFormat.yMMMM().format(selectedMonth)}'
+                  : 'No Budget Set',
+            ),
+            subtitle: budget != null
+                ? Text(
+                    '$currencySymbol${budget.amount.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                : const Text('Set a monthly budget to track spending'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              final result = await showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) =>
+                    BudgetSettingsSheet(initialBudget: budget?.amount),
+              );
+              if (result != null) {
+                ref
+                    .read(budgetAlertControllerProvider.notifier)
+                    .resetForNewMonth();
+              }
+            },
+          ),
+          if (budget != null) ...[
+            const Divider(height: 1, indent: 72),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _BudgetStat(
+                    label: 'Budget',
+                    value: '$currencySymbol${budget.amount.toStringAsFixed(0)}',
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  _BudgetStat(
+                    label: 'Spent',
+                    value:
+                        '$currencySymbol${ref.watch(monthlyExpensesProvider).toStringAsFixed(0)}',
+                    color: Colors.orange,
+                  ),
+                  _BudgetStat(
+                    label: 'Remaining',
+                    value:
+                        '$currencySymbol${ref.watch(budgetRemainingProvider).toStringAsFixed(0)}',
+                    color: ref.watch(budgetRemainingProvider) >= 0
+                        ? Colors.green
+                        : Colors.red,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _BudgetStat extends StatelessWidget {
+  const _BudgetStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+        ),
+      ],
     );
   }
 }

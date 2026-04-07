@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/app_user.dart';
+import '../models/budget_model.dart';
 import '../models/transaction_model.dart';
 import '../providers/app_providers.dart';
+import 'budget/budget_settings_sheet.dart';
 import 'dashboard/dashboard_view.dart';
 import 'reports/reports_view.dart';
 import 'settings/settings_view.dart';
@@ -39,6 +41,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     });
   }
 
+  void _checkBudgetAlerts(WidgetRef ref) {
+    final alertLevel = ref.read(budgetAlertProvider);
+    final alertController = ref.read(budgetAlertControllerProvider.notifier);
+    alertController.checkAndUpdateAlert(alertLevel);
+  }
+
   void _showAddTransaction() async {
     final result = await showModalBottomSheet(
       context: context,
@@ -52,28 +60,41 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _checkBudgetAlerts(ref));
+
     final colorScheme = Theme.of(context).colorScheme;
     final showFab = _index == 0;
+    final alertLevel = ref.watch(budgetAlertProvider);
 
     return Scaffold(
       body: SafeArea(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          transitionBuilder: (child, animation) {
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.02, 0),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
+        child: Column(
+          children: [
+            if (alertLevel != BudgetAlertLevel.none && _index == 0)
+              const BudgetAlertBanner(),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.02, 0),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  );
+                },
+                child:
+                    KeyedSubtree(key: ValueKey(_index), child: _pages[_index]),
               ),
-            );
-          },
-          child: KeyedSubtree(key: ValueKey(_index), child: _pages[_index]),
+            ),
+          ],
         ),
       ),
       floatingActionButton: showFab
