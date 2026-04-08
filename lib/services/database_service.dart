@@ -4,7 +4,6 @@ class DatabaseService {
   static const usersBoxName = 'users_box';
   static const transactionsBoxName = 'transactions_box';
   static const appBoxName = 'app_box';
-  static const processedSmsIdsKey = 'processed_sms_ids';
 
   Box<Map>? _usersBox;
   Box<Map>? _transactionsBox;

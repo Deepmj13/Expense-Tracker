@@ -64,7 +64,6 @@ enum PaymentMethod {
 
 enum TransactionSource {
   manual,
-  smsAutoImport,
 }
 
 class TransactionModel {
