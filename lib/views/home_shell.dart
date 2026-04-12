@@ -7,8 +7,11 @@ import '../models/app_user.dart';
 import '../models/budget_model.dart';
 import '../models/transaction_model.dart';
 import '../providers/app_providers.dart';
+import '../services/notification_channel_service.dart';
+import '../services/notification_manager.dart';
 import 'budget/budget_settings_sheet.dart';
 import 'dashboard/dashboard_view.dart';
+import 'onboarding/notification_onboarding_view.dart';
 import 'reports/reports_view.dart';
 import 'settings/settings_view.dart';
 import 'transactions/transaction_form_sheet.dart';
@@ -42,11 +45,41 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     });
   }
 
-  void _initialize() {
+  Future<void> _initialize() async {
     if (_initialized) return;
     _initialized = true;
     ref.read(transactionsControllerProvider.notifier).load(widget.user.id);
     _checkBudgetAlerts();
+
+    try {
+      await showNotificationOnboarding(context);
+    } catch (e) {
+      debugPrint('Notification onboarding error: $e');
+    }
+
+    try {
+      final hasAccess =
+          await NotificationChannelService().isNotificationAccessEnabled();
+      if (!hasAccess) return;
+
+      final notificationManager = ref.read(notificationManagerProvider);
+      await notificationManager.initialize();
+    } catch (e) {
+      debugPrint('Notification manager init error: $e');
+    }
+  }
+
+  void retryNotificationInit() async {
+    try {
+      final hasAccess =
+          await NotificationChannelService().isNotificationAccessEnabled();
+      if (!hasAccess) return;
+
+      final notificationManager = ref.read(notificationManagerProvider);
+      await notificationManager.initialize();
+    } catch (e) {
+      debugPrint('Notification manager retry error: $e');
+    }
   }
 
   void _checkBudgetAlerts() {

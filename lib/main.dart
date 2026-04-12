@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'core/themes/app_theme.dart';
 import 'providers/app_providers.dart';
 import 'services/database_service.dart';
+import 'services/notification_manager.dart';
 import 'views/auth/auth_wrapper.dart';
 import 'views/home_shell.dart';
 
@@ -17,6 +18,7 @@ Future<void> main() async {
 final _routerProvider = Provider<GoRouter>((ref) {
   final user = ref.watch(authControllerProvider);
   return GoRouter(
+    navigatorKey: navigatorKey,
     initialLocation: user == null ? '/auth' : '/home',
     routes: [
       GoRoute(
