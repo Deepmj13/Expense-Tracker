@@ -4,11 +4,15 @@ import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/notification_apps.dart';
 import '../../providers/app_providers.dart';
+import '../../services/notification_channel_service.dart';
 import '../budget/budget_settings_sheet.dart';
+import '../onboarding/notification_onboarding_view.dart';
 import 'feedback_sheet.dart';
 
 class SettingsView extends ConsumerWidget {
@@ -220,6 +224,10 @@ class SettingsView extends ConsumerWidget {
         _SectionHeader(title: 'Budget'),
         const SizedBox(height: 12),
         _BudgetManagementCard(ref: ref),
+        const SizedBox(height: 24),
+        _SectionHeader(title: 'Notifications'),
+        const SizedBox(height: 12),
+        _NotificationSettingsCard(),
         const SizedBox(height: 24),
         _SectionHeader(title: 'Data'),
         const SizedBox(height: 12),
@@ -492,6 +500,326 @@ class _BudgetStat extends StatelessWidget {
               ),
         ),
       ],
+    );
+  }
+}
+
+class _NotificationSettingsCard extends ConsumerStatefulWidget {
+  const _NotificationSettingsCard();
+
+  @override
+  ConsumerState<_NotificationSettingsCard> createState() =>
+      _NotificationSettingsCardState();
+}
+
+class _NotificationSettingsCardState
+    extends ConsumerState<_NotificationSettingsCard> {
+  bool _isAutoAddEnabled = true;
+  bool _hasNotificationAccess = false;
+  bool _hasBatteryOptimization = false;
+  bool _isLoading = true;
+  String _deviceManufacturer = 'unknown';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final channelService = NotificationChannelService();
+
+    final isEnabled = await channelService.isAutoAddEnabled();
+    final hasAccess = await channelService.isNotificationAccessEnabled();
+    final hasBattery = await channelService.isBatteryOptimizationDisabled();
+    final manufacturer = await channelService.getDeviceManufacturer();
+
+    if (mounted) {
+      setState(() {
+        _isAutoAddEnabled = isEnabled;
+        _hasNotificationAccess = hasAccess;
+        _hasBatteryOptimization = hasBattery;
+        _deviceManufacturer = manufacturer;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _toggleAutoAdd(bool value) async {
+    final channelService = NotificationChannelService();
+    await channelService.setAutoAddEnabled(value);
+    setState(() {
+      _isAutoAddEnabled = value;
+    });
+  }
+
+  Future<void> _openNotificationSettings() async {
+    final channelService = NotificationChannelService();
+    await channelService.openNotificationSettings();
+    await Future.delayed(const Duration(milliseconds: 1000));
+    await _loadSettings();
+  }
+
+  Future<void> _openBatterySettings() async {
+    final channelService = NotificationChannelService();
+    await channelService.requestBatteryOptimizationExemption();
+    await Future.delayed(const Duration(milliseconds: 1000));
+    await _loadSettings();
+  }
+
+  Future<void> _openAutoStartSettings() async {
+    final channelService = NotificationChannelService();
+    await channelService.openAutoStartSettings();
+  }
+
+  Future<void> _resetOnboarding() async {
+    final box = Hive.box('app_box');
+    await box.put('notification_onboarding_completed', false);
+    if (mounted) {
+      final result = await showNotificationOnboarding(context);
+      if (result == true) {
+        await _loadSettings();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Container(
+        height: 120,
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardTheme.color,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final isFullyConfigured = _hasNotificationAccess && _hasBatteryOptimization;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _isAutoAddEnabled
+                    ? Colors.green.withValues(alpha: 0.1)
+                    : Colors.grey.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                _isAutoAddEnabled
+                    ? Icons.notifications_active
+                    : Icons.notifications_off,
+                color: _isAutoAddEnabled ? Colors.green : Colors.grey,
+              ),
+            ),
+            title: const Text('Auto-Detect Transactions'),
+            subtitle: Text(
+              _isAutoAddEnabled
+                  ? 'Automatically add transactions from notifications'
+                  : 'Disabled - transactions will not be auto-added',
+            ),
+            trailing: Switch(
+              value: _isAutoAddEnabled,
+              onChanged: _toggleAutoAdd,
+            ),
+          ),
+          if (_isAutoAddEnabled) ...[
+            const Divider(height: 1, indent: 72),
+            _StatusTile(
+              icon: Icons.notifications,
+              title: 'Notification Access',
+              isEnabled: _hasNotificationAccess,
+              statusText: _hasNotificationAccess ? 'Enabled' : 'Disabled',
+              onTap: _openNotificationSettings,
+            ),
+            const Divider(height: 1, indent: 72),
+            _StatusTile(
+              icon: Icons.battery_charging_full,
+              title: 'Battery Optimization',
+              isEnabled: _hasBatteryOptimization,
+              statusText: _hasBatteryOptimization ? 'Disabled' : 'Active',
+              onTap: _openBatterySettings,
+            ),
+            if (_deviceManufacturer != 'xiaomi' &&
+                _deviceManufacturer != 'redmi' &&
+                _deviceManufacturer != 'huawei' &&
+                _deviceManufacturer != 'honor' &&
+                _deviceManufacturer != 'oppo' &&
+                _deviceManufacturer != 'realme' &&
+                _deviceManufacturer != 'vivo' &&
+                _deviceManufacturer != 'oneplus' &&
+                _deviceManufacturer != 'samsung' &&
+                _deviceManufacturer != 'asus') ...[
+              const Divider(height: 1, indent: 72),
+              _StatusTile(
+                icon: Icons.power_settings_new,
+                title: 'Auto-Start',
+                isEnabled: true,
+                statusText: 'Not required',
+                onTap: null,
+              ),
+            ] else ...[
+              const Divider(height: 1, indent: 72),
+              _StatusTile(
+                icon: Icons.power_settings_new,
+                title: 'Auto-Start Settings',
+                isEnabled: true,
+                statusText: 'Configure for ${_getManufacturerName()}',
+                onTap: _openAutoStartSettings,
+              ),
+            ],
+            const Divider(height: 1, indent: 72),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        isFullyConfigured
+                            ? Icons.check_circle
+                            : Icons.warning_amber,
+                        size: 16,
+                        color: isFullyConfigured ? Colors.green : Colors.orange,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isFullyConfigured
+                            ? 'All permissions configured'
+                            : 'Some permissions need attention',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: isFullyConfigured
+                                  ? Colors.green
+                                  : Colors.orange,
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primaryContainer
+                              .withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${NotificationApps.defaultApps.length} apps monitored',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onPrimaryContainer,
+                                  ),
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: _resetOnboarding,
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Re-setup'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _getManufacturerName() {
+    final manufacturer = _deviceManufacturer.toLowerCase();
+    final names = {
+      'xiaomi': 'Xiaomi',
+      'redmi': 'Redmi',
+      'samsung': 'Samsung',
+      'huawei': 'Huawei',
+      'honor': 'Honor',
+      'oppo': 'OPPO',
+      'realme': 'Realme',
+      'vivo': 'Vivo',
+      'oneplus': 'OnePlus',
+      'asus': 'ASUS',
+    };
+    for (final entry in names.entries) {
+      if (manufacturer.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+    return _deviceManufacturer;
+  }
+}
+
+class _StatusTile extends StatelessWidget {
+  const _StatusTile({
+    required this.icon,
+    required this.title,
+    required this.isEnabled,
+    required this.statusText,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final bool isEnabled;
+  final String statusText;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isEnabled
+              ? Colors.green.withValues(alpha: 0.1)
+              : Colors.orange.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          color: isEnabled ? Colors.green : Colors.orange,
+          size: 20,
+        ),
+      ),
+      title: Text(title),
+      subtitle: Text(statusText),
+      trailing: onTap != null
+          ? TextButton(
+              onPressed: onTap,
+              child: Text(
+                isEnabled ? 'Settings' : 'Enable',
+                style: TextStyle(
+                  color: isEnabled
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.orange,
+                ),
+              ),
+            )
+          : null,
+      onTap: onTap,
     );
   }
 }
