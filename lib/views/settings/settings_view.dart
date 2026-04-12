@@ -6,11 +6,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/notification_apps.dart';
 import '../../providers/app_providers.dart';
 import '../../services/notification_channel_service.dart';
+import '../../services/database_service.dart';
+import '../../services/transaction_service.dart';
+import '../../services/sms_transaction_service.dart';
+import '../../services/transaction_parser.dart';
 import '../budget/budget_settings_sheet.dart';
 import '../onboarding/notification_onboarding_view.dart';
 import 'feedback_sheet.dart';
@@ -143,6 +148,53 @@ class SettingsView extends ConsumerWidget {
     );
   }
 
+  Future<void> _syncSms(BuildContext context, WidgetRef ref) async {
+    final smsPermission = await Permission.sms.request();
+    if (smsPermission != PermissionStatus.granted) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('SMS permission is required to sync transactions'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    final user = ref.read(authControllerProvider);
+    if (user == null) return;
+
+    try {
+      final dbService = DatabaseService();
+      await dbService.init();
+      final transactionService = TransactionService(dbService);
+      final parser = TransactionParser();
+      final smsService =
+          SmsTransactionService(dbService, transactionService, parser);
+
+      final addedCount = await smsService.syncSmsTransactions(user.id);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sync complete. Added $addedCount new transactions.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error syncing SMS: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
@@ -236,65 +288,92 @@ class SettingsView extends ConsumerWidget {
             color: Theme.of(context).cardTheme.color,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+          child: Column(
+            children: [
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.sms, color: Colors.blue),
+                ),
+                title: const Text('Sync from SMS'),
+                subtitle: const Text('Automatically import bank transactions'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _syncSms(context, ref),
               ),
-              child: const Icon(Icons.file_download, color: Colors.green),
-            ),
-            title: const Text('Export Transactions'),
-            subtitle: const Text('Save CSV file to your device'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () async {
-              final transactions = ref.read(transactionsControllerProvider);
+              const Divider(height: 1, indent: 72),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.file_download, color: Colors.green),
+                ),
+                title: const Text('Export Transactions'),
+                subtitle: const Text('Save CSV file to your device'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  final transactions = ref.read(transactionsControllerProvider);
 
-              final rows = [
-                ['id', 'title', 'amount', 'type', 'category', 'date', 'note'],
-                ...transactions.map((t) => [
-                      t.id,
-                      t.title,
-                      t.amount,
-                      t.type.name,
-                      t.category,
-                      t.date.toIso8601String(),
-                      t.note,
-                    ]),
-              ];
+                  final rows = [
+                    [
+                      'id',
+                      'title',
+                      'amount',
+                      'type',
+                      'category',
+                      'date',
+                      'note'
+                    ],
+                    ...transactions.map((t) => [
+                          t.id,
+                          t.title,
+                          t.amount,
+                          t.type.name,
+                          t.category,
+                          t.date.toIso8601String(),
+                          t.note,
+                        ]),
+                  ];
 
-              final csv = const ListToCsvConverter().convert(rows);
-              final timestamp =
-                  DateTime.now().toIso8601String().replaceAll(':', '-');
-              final bytes = Uint8List.fromList(csv.codeUnits);
+                  final csv = const ListToCsvConverter().convert(rows);
+                  final timestamp =
+                      DateTime.now().toIso8601String().replaceAll(':', '-');
+                  final bytes = Uint8List.fromList(csv.codeUnits);
 
-              final result = await FilePicker.platform.saveFile(
-                dialogTitle: 'Choose save location',
-                fileName: 'expense_export_$timestamp.csv',
-                type: FileType.custom,
-                allowedExtensions: ['csv'],
-                bytes: bytes,
-              );
-
-              if (context.mounted) {
-                if (result != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('CSV saved to: $result'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
+                  final result = await FilePicker.platform.saveFile(
+                    dialogTitle: 'Choose save location',
+                    fileName: 'expense_export_$timestamp.csv',
+                    type: FileType.custom,
+                    allowedExtensions: ['csv'],
+                    bytes: bytes,
                   );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Export cancelled'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              }
-            },
+
+                  if (context.mounted) {
+                    if (result != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('CSV saved to: $result'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Export cancelled'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 24),
