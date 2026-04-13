@@ -1,38 +1,150 @@
-import '../models/notification_model.dart';
+import '../models/transaction_message_model.dart';
 import '../models/parsed_transaction.dart';
 import '../models/transaction_type.dart';
-import '../core/constants/notification_apps.dart';
+
+class _AmountPattern {
+  _AmountPattern(this.regex, this.priority);
+  final RegExp regex;
+  final int priority;
+}
+
+class _AmountMatch {
+  _AmountMatch(this.amount, this.position, this.priority);
+  final double amount;
+  final int position;
+  final int priority;
+}
+
+class _TypeResult {
+  _TypeResult(this.type, this.isCredit);
+  final TransactionType type;
+  final bool isCredit;
+}
 
 class TransactionParser {
   const TransactionParser();
 
-  ParsedTransaction? parse(NotificationModel notification) {
-    final rawText = notification.rawText;
-    final packageName = notification.packageName;
+  ParsedTransaction? parse(TransactionMessageModel message) {
+    final rawText = message.rawText;
+    final packageName = message.packageName;
 
-    final amount = extractAmount(rawText);
+    final typeResult = determineType(rawText);
+    if (typeResult == null) return null;
+
+    final amount = extractAmount(rawText, typeResult.isCredit);
     if (amount == null || amount <= 0) return null;
 
-    final type = determineType(rawText);
-    final source = extractSource(rawText, type == TransactionType.income);
+    final source = extractSource(rawText, typeResult.isCredit);
     final category = determineCategory(rawText, packageName);
-    final title = generateTitle(rawText, packageName, source);
+    final title = generateTitle(
+        rawText, packageName, source, typeResult.isCredit, amount);
 
     return ParsedTransaction(
       amount: amount,
-      type: type,
+      type: typeResult.type,
       title: title,
       category: category,
       source: source,
       rawText: rawText,
-      timestamp: notification.receivedAt,
+      timestamp: message.receivedAt,
     );
   }
 
-  double? extractAmount(String text) {
-    final amounts = extractAllAmounts(text);
+  double? extractAmount(String text, bool isCredit) {
+    final amounts = extractAllAmountsWithContext(text, isCredit);
     if (amounts.isEmpty) return null;
-    return amounts.reduce((a, b) => a > b ? a : b);
+    return amounts.first;
+  }
+
+  List<double> extractAllAmountsWithContext(String text, bool isCredit) {
+    final List<_AmountMatch> matches = [];
+    final patterns = [
+      _AmountPattern(RegExp(r'[\u20B9₹]\s*([\d,]+(?:\.\d{1,2})?)'), 10),
+      _AmountPattern(
+          RegExp(r'rs\.?\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false), 9),
+      _AmountPattern(
+          RegExp(r'inr\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false), 8),
+      _AmountPattern(RegExp(r'\$\s*([\d,]+(?:\.\d{1,2})?)'), 7),
+      _AmountPattern(
+          RegExp(r'(?:amount|amt)[:\s]*([\d,]+(?:\.\d{1,2})?)',
+              caseSensitive: false),
+          6),
+      _AmountPattern(RegExp(r'\b([\d,]+\.\d{2})\b'), 1),
+    ];
+
+    final lowerText = text.toLowerCase();
+
+    for (final pattern in patterns) {
+      for (final match in pattern.regex.allMatches(text)) {
+        if (match.groupCount >= 1) {
+          final amountStr = match.group(1)?.replaceAll(',', '') ?? '';
+          final amount = double.tryParse(amountStr);
+          if (amount != null && amount > 0 && amount < 100000000) {
+            matches.add(_AmountMatch(amount, match.start, pattern.priority));
+          }
+        }
+      }
+    }
+
+    if (matches.isEmpty) return [];
+
+    _AmountMatch? transactionAmount;
+
+    if (isCredit) {
+      final creditedPatterns = [
+        'credited',
+        'received',
+        'deposited',
+        'refund',
+        'cashback',
+      ];
+
+      for (final keyword in creditedPatterns) {
+        final keywordIndex = lowerText.indexOf(keyword);
+        if (keywordIndex != -1) {
+          transactionAmount = _findClosestAmount(matches, keywordIndex);
+          break;
+        }
+      }
+    } else {
+      final debitedPatterns = [
+        'debited',
+        'paid',
+        'spent',
+        'withdrawn',
+        'deducted',
+        'payment to',
+      ];
+
+      for (final keyword in debitedPatterns) {
+        final keywordIndex = lowerText.indexOf(keyword);
+        if (keywordIndex != -1) {
+          transactionAmount = _findClosestAmount(matches, keywordIndex);
+          break;
+        }
+      }
+    }
+
+    transactionAmount ??=
+        matches.reduce((a, b) => a.priority > b.priority ? a : b);
+
+    return [transactionAmount.amount];
+  }
+
+  _AmountMatch _findClosestAmount(
+      List<_AmountMatch> matches, int keywordIndex) {
+    _AmountMatch? closest;
+    int minDistance = 999999;
+
+    for (final match in matches) {
+      final distance = (match.position - keywordIndex).abs();
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = match;
+      }
+    }
+
+    return closest!;
   }
 
   List<double> extractAllAmounts(String text) {
@@ -44,7 +156,6 @@ class TransactionParser {
       RegExp(r'\$\s*([\d,]+(?:\.\d{1,2})?)'),
       RegExp(r'(?:amount|amt)[:\s]*([\d,]+(?:\.\d{1,2})?)',
           caseSensitive: false),
-      RegExp(r'(?:rs\.?|₹)\s*([\d,]*\.\d{2})\b'),
       RegExp(r'\b([\d,]+\.\d{2})\b'),
     ];
 
@@ -63,7 +174,7 @@ class TransactionParser {
     return amountSet.toList();
   }
 
-  TransactionType determineType(String text) {
+  _TypeResult? determineType(String text) {
     final lowerText = text.toLowerCase();
 
     final creditKeywords = [
@@ -108,17 +219,17 @@ class TransactionParser {
 
     for (final keyword in creditKeywords) {
       if (lowerText.contains(keyword)) {
-        return TransactionType.income;
+        return _TypeResult(TransactionType.income, true);
       }
     }
 
     for (final keyword in debitKeywords) {
       if (lowerText.contains(keyword)) {
-        return TransactionType.expense;
+        return _TypeResult(TransactionType.expense, false);
       }
     }
 
-    return TransactionType.expense;
+    return null;
   }
 
   ParsedSource? extractSource(String text, bool isCredit) {
@@ -344,55 +455,84 @@ class TransactionParser {
       }
     }
 
-    final appInfo = NotificationApps.findAppByPackage(packageName);
-    if (appInfo != null) {
-      final appCategoryMap = {
-        'UPI': 'Transfer',
-        'Banking': 'Banking',
-        'Shopping': 'Shopping',
-        'Food': 'Food',
-        'Transport': 'Transport',
-        'Bills': 'Bills',
-        'Entertainment': 'Entertainment',
-        'Subscription': 'Entertainment',
-      };
-      final mappedCategory = appCategoryMap[appInfo.category];
-      if (mappedCategory != null) {
-        return mappedCategory;
-      }
-    }
-
     return 'Other';
   }
 
-  String generateTitle(String text, String packageName, ParsedSource? source) {
-    if (text.length > 4) {
-      final truncated = text.length > 50 ? '${text.substring(0, 47)}...' : text;
-      return _capitalizeWords(truncated);
+  String generateTitle(String text, String packageName, ParsedSource? source,
+      bool isCredit, double amount) {
+    final lowerText = text.toLowerCase();
+    final currencySymbol = text.contains('₹')
+        ? '₹'
+        : (text.contains('rs') || text.contains('inr') ? 'Rs.' : '\$');
+
+    String? merchantName;
+
+    final merchantPatterns = [
+      'swiggy',
+      'zomato',
+      'ubereats',
+      'dominos',
+      'pizza hut',
+      'kfc',
+      'mcdonalds',
+      'amazon',
+      'flipkart',
+      'myntra',
+      'snapdeal',
+      'meesho',
+      'ajio',
+      'nykaa',
+      'uber',
+      'ola',
+      'rapido',
+      'indriver',
+      'paytm',
+      'phonepe',
+      'gpay',
+      'google pay',
+      'bhim',
+      'netflix',
+      'prime',
+      'hotstar',
+      'disney',
+      'spotify',
+      'youtube premium',
+      'airtel',
+      'jio',
+      'bsnl',
+      'electricity',
+      'gas bill',
+      'water bill',
+    ];
+
+    for (final merchant in merchantPatterns) {
+      if (lowerText.contains(merchant)) {
+        merchantName = _capitalizeFirst(merchant);
+        break;
+      }
     }
 
-    final appInfo = NotificationApps.findAppByPackage(packageName);
-    if (appInfo != null) {
-      return 'Transaction via ${appInfo.name}';
+    if (merchantName != null) {
+      return '$merchantName Payment';
     }
 
     if (source?.upiId != null) {
-      return 'Transaction ${source!.upiId}';
+      return 'UPI ${isCredit ? 'Received' : 'Payment'}';
     }
 
     if (source?.bankName != null) {
-      return 'Transaction ${source!.bankName}';
+      return '${source!.bankName} ${isCredit ? 'Credit' : 'Debit'}';
     }
 
-    return 'Notification Transaction';
+    if (source?.appName != null) {
+      return '${source!.appName} Transaction';
+    }
+
+    return '${isCredit ? '+' : '-'}$currencySymbol${amount.toStringAsFixed(0)} ${isCredit ? 'Received' : 'Paid'}';
   }
 
-  String _capitalizeWords(String text) {
+  String _capitalizeFirst(String text) {
     if (text.isEmpty) return text;
-    return text.split(' ').map((word) {
-      if (word.isEmpty) return word;
-      if (word == '₹') return word;
-      return word[0].toUpperCase() + word.substring(1);
-    }).join(' ');
+    return text[0].toUpperCase() + text.substring(1);
   }
 }

@@ -2,16 +2,17 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../models/app_user.dart';
 import '../models/budget_model.dart';
 import '../models/transaction_model.dart';
 import '../providers/app_providers.dart';
-import '../services/notification_channel_service.dart';
-import '../services/notification_manager.dart';
+import '../services/sms_sync_manager.dart';
+import '../services/sms_sync_preference_service.dart';
 import 'budget/budget_settings_sheet.dart';
 import 'dashboard/dashboard_view.dart';
-import 'onboarding/notification_onboarding_view.dart';
+import 'onboarding/sms_sync_dialog.dart';
 import 'reports/reports_view.dart';
 import 'settings/settings_view.dart';
 import 'transactions/transaction_form_sheet.dart';
@@ -30,11 +31,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
   bool _initialized = false;
 
-  final _pages = const [
-    DashboardView(),
-    TransactionsView(),
-    ReportsView(),
-    SettingsView(),
+  static final _pages = [
+    const DashboardView(),
+    const TransactionsView(),
+    const ReportsView(),
+    const SettingsView(),
   ];
 
   @override
@@ -48,37 +49,86 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Future<void> _initialize() async {
     if (_initialized) return;
     _initialized = true;
-    ref.read(transactionsControllerProvider.notifier).load(widget.user.id);
+    await ref
+        .read(transactionsControllerProvider.notifier)
+        .load(widget.user.id);
     _checkBudgetAlerts();
+    await _checkSmsSync();
+  }
 
-    try {
-      await showNotificationOnboarding(context);
-    } catch (e) {
-      debugPrint('Notification onboarding error: $e');
-    }
+  Future<void> _checkSmsSync() async {
+    final syncManagerAsync = await ref.read(smsSyncManagerProvider.future);
+    final smsPermission = await Permission.sms.status;
+    final prefs = syncManagerAsync.getPreferences();
 
-    try {
-      final hasAccess =
-          await NotificationChannelService().isNotificationAccessEnabled();
-      if (!hasAccess) return;
+    if (smsPermission.isGranted) {
+      if (prefs.preference == SyncPreference.none) {
+        return;
+      }
+      await _performSmsSync(syncManagerAsync);
+    } else {
+      final result = await _showSmsSyncDialog();
+      if (result == null) return;
 
-      final notificationManager = ref.read(notificationManagerProvider);
-      await notificationManager.initialize();
-    } catch (e) {
-      debugPrint('Notification manager init error: $e');
+      final preference = result['preference'] as SyncPreference;
+      final fromDate = result['fromDate'] as DateTime?;
+
+      await syncManagerAsync.savePreference(preference, fromDate: fromDate);
+
+      if (preference == SyncPreference.none) return;
+
+      final status = await Permission.sms.request();
+      if (status.isGranted) {
+        await _performSmsSync(syncManagerAsync);
+      }
     }
   }
 
-  void retryNotificationInit() async {
-    try {
-      final hasAccess =
-          await NotificationChannelService().isNotificationAccessEnabled();
-      if (!hasAccess) return;
+  Future<Map<String, dynamic>?> _showSmsSyncDialog() async {
+    return showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const SmsSyncDialog(),
+    );
+  }
 
-      final notificationManager = ref.read(notificationManagerProvider);
-      await notificationManager.initialize();
+  Future<void> _performSmsSync(SmsSyncManager syncManager) async {
+    try {
+      final result = await syncManager.syncAll(widget.user.id);
+
+      if (result.addedCount > 0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${result.addedCount} new transaction${result.addedCount > 1 ? 's' : ''} added from SMS',
+            ),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'View',
+              onPressed: () {
+                setState(() {});
+              },
+            ),
+          ),
+        );
+
+        await syncManager.showSyncNotification(context, result.addedCount);
+      }
+
+      await ref
+          .read(transactionsControllerProvider.notifier)
+          .load(widget.user.id);
     } catch (e) {
-      debugPrint('Notification manager retry error: $e');
+      debugPrint('SMS sync error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to sync: ${e.toString()}'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

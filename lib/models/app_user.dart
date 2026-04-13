@@ -42,33 +42,51 @@ class AppUser {
     required this.id,
     required this.name,
     required this.email,
-    required this.password,
     required this.country,
     required this.currencySymbol,
+    this.sessionToken,
   });
 
   final String id;
   final String name;
   final String email;
-  final String password;
   final String country;
   final String currencySymbol;
+  final String? sessionToken;
+
+  AppUser copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? country,
+    String? currencySymbol,
+    String? sessionToken,
+  }) {
+    return AppUser(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      country: country ?? this.country,
+      currencySymbol: currencySymbol ?? this.currencySymbol,
+      sessionToken: sessionToken ?? this.sessionToken,
+    );
+  }
 
   Map<String, dynamic> toMap() => {
         'id': id,
         'name': name,
         'email': email,
-        'password': password,
         'country': country,
         'currencySymbol': currencySymbol,
+        'sessionToken': sessionToken,
       };
 
   factory AppUser.fromMap(Map<dynamic, dynamic> map) => AppUser(
         id: map['id'] as String,
         name: map['name'] as String,
         email: map['email'] as String,
-        password: map['password'] as String,
         country: map['country'] as String? ?? 'India',
         currencySymbol: map['currencySymbol'] as String? ?? '₹',
+        sessionToken: map['sessionToken'] as String?,
       );
 }

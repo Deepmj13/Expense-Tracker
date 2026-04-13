@@ -1,5 +1,5 @@
-class NotificationModel {
-  const NotificationModel({
+class TransactionMessageModel {
+  const TransactionMessageModel({
     required this.rawText,
     required this.packageName,
     required this.receivedAt,
@@ -11,13 +11,13 @@ class NotificationModel {
 
   @override
   String toString() {
-    return 'NotificationModel(packageName: $packageName, receivedAt: $receivedAt, rawText: $rawText)';
+    return 'TransactionMessageModel(packageName: $packageName, receivedAt: $receivedAt, rawText: $rawText)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is NotificationModel &&
+    return other is TransactionMessageModel &&
         other.packageName == packageName &&
         other.receivedAt == receivedAt &&
         other.rawText == rawText;

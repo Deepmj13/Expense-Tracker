@@ -64,7 +64,7 @@ enum PaymentMethod {
 
 enum TransactionSource {
   manual,
-  notification,
+  sms,
 }
 
 class TransactionModel {

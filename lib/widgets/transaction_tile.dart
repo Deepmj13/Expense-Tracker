@@ -120,7 +120,7 @@ class TransactionTile extends ConsumerWidget {
                     ),
                   ),
                 ],
-                if (item.source == TransactionSource.notification) ...[
+                if (item.source == TransactionSource.sms) ...[
                   const SizedBox(width: 8),
                   Container(
                     padding:
@@ -130,7 +130,7 @@ class TransactionTile extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      'Auto',
+                      'SMS',
                       style: TextStyle(
                         fontSize: 10,
                         color: Colors.blue.shade700,

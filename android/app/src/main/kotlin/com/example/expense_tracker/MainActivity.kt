@@ -13,45 +13,13 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val NOTIFICATION_CHANNEL = "com.example.expense_tracker/notifications"
     private val METHOD_CHANNEL = "com.example.expense_tracker/methods"
-    private var notificationEventChannel: EventChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        notificationEventChannel = EventChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            NOTIFICATION_CHANNEL
-        )
-
-        notificationEventChannel?.setStreamHandler(object : EventChannel.StreamHandler {
-            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                NotificationInterceptorService.instance?.setEventSink(events)
-            }
-
-            override fun onCancel(arguments: Any?) {
-                NotificationInterceptorService.instance?.setEventSink(null)
-            }
-        })
-
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
-                "isNotificationAccessEnabled" -> {
-                    result.success(isNotificationAccessGranted())
-                }
-                "openNotificationSettings" -> {
-                    openNotificationSettings()
-                    result.success(null)
-                }
-                "getNotificationAccessSettingsIntent" -> {
-                    result.success(getNotificationAccessIntent())
-                }
-                "setMonitoredApps" -> {
-                    val packages = call.arguments as? List<String>
-                    NotificationInterceptorService.instance?.setMonitoredPackages(packages?.toSet() ?: emptySet())
-                    result.success(null)
-                }
                 "isBatteryOptimizationDisabled" -> {
                     result.success(isBatteryOptimizationDisabled())
                 }
@@ -75,25 +43,6 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
-    }
-
-    private fun isNotificationAccessGranted(): Boolean {
-        val componentName = ComponentName(this, NotificationInterceptorService::class.java)
-        val enabledListeners = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-        return enabledListeners?.contains(componentName.flattenToString()) == true
-    }
-
-    private fun openNotificationSettings() {
-        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        startActivity(intent)
-    }
-
-    private fun getNotificationAccessIntent(): Map<String, String?> {
-        return mapOf(
-            "action" to Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS,
-            "package" to packageName
-        )
     }
 
     private fun isBatteryOptimizationDisabled(): Boolean {

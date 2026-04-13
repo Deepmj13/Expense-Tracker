@@ -10,6 +10,11 @@ import '../models/transaction_type.dart';
 import '../services/auth_service.dart';
 import '../services/budget_service.dart';
 import '../services/database_service.dart';
+import '../services/notification_service.dart';
+import '../services/sms_sync_manager.dart';
+import '../services/sms_sync_preference_service.dart';
+import '../services/sms_transaction_service.dart';
+import '../services/transaction_parser.dart';
 import '../services/transaction_service.dart';
 
 final dbServiceProvider = Provider<DatabaseService>((_) => DatabaseService());
@@ -19,7 +24,31 @@ final transactionServiceProvider = Provider<TransactionService>(
     (ref) => TransactionService(ref.read(dbServiceProvider)));
 final budgetServiceProvider = Provider<BudgetService>(
     (ref) => BudgetService(ref.read(dbServiceProvider)));
-final _secureStorage = const FlutterSecureStorage();
+final transactionParserProvider =
+    Provider<TransactionParser>((_) => const TransactionParser());
+final smsSyncPreferenceServiceProvider =
+    FutureProvider<SmsSyncPreferenceService>((_) async {
+  final service = SmsSyncPreferenceService();
+  await service.init();
+  return service;
+});
+final smsTransactionServiceProvider = Provider<SmsTransactionService>((ref) {
+  final dbService = ref.watch(dbServiceProvider);
+  final transactionService = ref.watch(transactionServiceProvider);
+  final parser = ref.watch(transactionParserProvider);
+  return SmsTransactionService(dbService, transactionService, parser);
+});
+final smsSyncManagerProvider = FutureProvider<SmsSyncManager>((ref) async {
+  final smsService = ref.watch(smsTransactionServiceProvider);
+  final prefService = await ref.watch(smsSyncPreferenceServiceProvider.future);
+  final notifService = NotificationService.instance;
+  return SmsSyncManager(
+    smsService: smsService,
+    preferenceService: prefService,
+    notificationService: notifService,
+  );
+});
+const _secureStorage = FlutterSecureStorage();
 
 final themeModeProvider =
     StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
@@ -35,10 +64,13 @@ final accentColorProvider =
 });
 
 class AccentColorNotifier extends StateNotifier<Color> {
-  AccentColorNotifier() : super(Color(AppConstants.defaultAccentColor));
+  AccentColorNotifier() : super(const Color(0xFF6750A4)) {
+    _loadColor();
+  }
 
-  @override
-  Color get state => Color(AppConstants.getAccentColor());
+  Future<void> _loadColor() async {
+    state = Color(AppConstants.getAccentColor());
+  }
 
   Future<void> setAccentColor(Color color) async {
     state = color;
@@ -152,7 +184,7 @@ class TransactionsController extends StateNotifier<List<TransactionModel>> {
   final TransactionService _service;
   String? _userId;
 
-  void load(String userId) {
+  Future<void> load(String userId) async {
     _userId = userId;
     state = _service.getAll(userId);
   }
@@ -210,10 +242,9 @@ final selectedMonthProvider = StateProvider<DateTime>((ref) {
 });
 
 final currentBudgetProvider = Provider<BudgetModel?>((ref) {
-  ref.watch(budgetControllerProvider);
-  final service = ref.watch(budgetServiceProvider);
-  final selectedMonth = ref.watch(selectedMonthProvider);
-  return service.getBudget(selectedMonth.month, selectedMonth.year);
+  final budget = ref.watch(budgetControllerProvider);
+  ref.watch(selectedMonthProvider);
+  return budget;
 });
 
 final monthlyExpensesProvider = Provider<double>((ref) {

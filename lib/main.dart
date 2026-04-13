@@ -5,15 +5,34 @@ import 'package:go_router/go_router.dart';
 import 'core/themes/app_theme.dart';
 import 'providers/app_providers.dart';
 import 'services/database_service.dart';
-import 'services/notification_manager.dart';
-import 'services/sms_background_service.dart';
+import 'services/notification_service.dart';
+import 'services/sms_background_sync_service.dart';
 import 'views/auth/auth_wrapper.dart';
 import 'views/home_shell.dart';
 
+final navigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await DatabaseService().init();
-  await SmsBackgroundService.init();
+
+  try {
+    await DatabaseService().init();
+  } catch (e) {
+    debugPrint('Failed to initialize database: $e');
+  }
+
+  try {
+    await NotificationService.instance.init();
+  } catch (e) {
+    debugPrint('Failed to initialize notifications: $e');
+  }
+
+  try {
+    await SmsBackgroundSyncService.instance.init();
+  } catch (e) {
+    debugPrint('Failed to initialize background sync: $e');
+  }
+
   runApp(const ProviderScope(child: ExpenseTrackerApp()));
 }
 
@@ -29,7 +48,12 @@ final _routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/home',
-        builder: (_, __) => HomeShell(user: user!),
+        builder: (_, __) {
+          if (user == null) {
+            return const AuthWrapper();
+          }
+          return HomeShell(user: user);
+        },
       ),
     ],
     redirect: (_, state) {

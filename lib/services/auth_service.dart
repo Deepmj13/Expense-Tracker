@@ -12,6 +12,7 @@ class AuthService {
   final DatabaseService _dbService;
   final _secureStorage = const FlutterSecureStorage();
   static const _sessionKey = 'current_user';
+  static const _passwordPrefix = 'pwd_hash_';
 
   Future<AppUser?> signup({
     required String name,
@@ -25,14 +26,20 @@ class AuthService {
     if (exists) return null;
 
     final hashedPassword = PasswordUtils.hash(password);
+    final userId = DateTime.now().microsecondsSinceEpoch.toString();
+
+    await _secureStorage.write(
+      key: '$_passwordPrefix$userId',
+      value: hashedPassword,
+    );
 
     final user = AppUser(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: userId,
       name: name.trim(),
       email: email.trim().toLowerCase(),
-      password: hashedPassword,
       country: country.name,
       currencySymbol: country.currencySymbol,
+      sessionToken: _generateSessionToken(),
     );
 
     await users.put(user.id, user.toMap());
@@ -41,15 +48,25 @@ class AuthService {
     return user;
   }
 
-  Future<AppUser?> login(
-      {required String email, required String password}) async {
+  Future<AppUser?> login({
+    required String email,
+    required String password,
+  }) async {
     final users = _dbService.usersBox();
 
     for (final userData in users.values) {
       if (userData['email'] == email.trim().toLowerCase()) {
-        final storedHash = userData['password'] as String;
+        final userId = userData['id'] as String;
+        final storedHash = await _secureStorage.read(
+          key: '$_passwordPrefix$userId',
+        );
+
+        if (storedHash == null) return null;
+
         if (PasswordUtils.verify(password, storedHash)) {
-          final user = AppUser.fromMap(userData);
+          final user = AppUser.fromMap(userData).copyWith(
+            sessionToken: _generateSessionToken(),
+          );
           await _secureStorage.write(
               key: _sessionKey, value: jsonEncode(user.toMap()));
           return user;
@@ -67,4 +84,10 @@ class AuthService {
   }
 
   Future<void> logout() => _secureStorage.delete(key: _sessionKey);
+
+  String _generateSessionToken() {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final random = timestamp.hashCode ^ DateTime.now().microsecond;
+    return base64Encode(utf8.encode('$timestamp:$random')).substring(0, 32);
+  }
 }

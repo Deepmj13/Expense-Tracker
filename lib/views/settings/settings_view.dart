@@ -4,20 +4,17 @@ import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/constants/app_constants.dart';
-import '../../core/constants/notification_apps.dart';
 import '../../providers/app_providers.dart';
-import '../../services/notification_channel_service.dart';
 import '../../services/database_service.dart';
+import '../../services/sms_sync_preference_service.dart';
 import '../../services/transaction_service.dart';
 import '../../services/sms_transaction_service.dart';
 import '../../services/transaction_parser.dart';
 import '../budget/budget_settings_sheet.dart';
-import '../onboarding/notification_onboarding_view.dart';
 import 'feedback_sheet.dart';
 
 class SettingsView extends ConsumerWidget {
@@ -277,9 +274,9 @@ class SettingsView extends ConsumerWidget {
         const SizedBox(height: 12),
         _BudgetManagementCard(ref: ref),
         const SizedBox(height: 24),
-        _SectionHeader(title: 'Notifications'),
+        _SectionHeader(title: 'SMS Sync'),
         const SizedBox(height: 12),
-        _NotificationSettingsCard(),
+        _SmsSyncCard(),
         const SizedBox(height: 24),
         _SectionHeader(title: 'Data'),
         const SizedBox(height: 12),
@@ -583,100 +580,109 @@ class _BudgetStat extends StatelessWidget {
   }
 }
 
-class _NotificationSettingsCard extends ConsumerStatefulWidget {
-  const _NotificationSettingsCard();
+class _SmsSyncCard extends ConsumerStatefulWidget {
+  const _SmsSyncCard();
 
   @override
-  ConsumerState<_NotificationSettingsCard> createState() =>
-      _NotificationSettingsCardState();
+  ConsumerState<_SmsSyncCard> createState() => _SmsSyncCardState();
 }
 
-class _NotificationSettingsCardState
-    extends ConsumerState<_NotificationSettingsCard> {
-  bool _isAutoAddEnabled = true;
-  bool _hasNotificationAccess = false;
-  bool _hasBatteryOptimization = false;
-  bool _isLoading = true;
-  String _deviceManufacturer = 'unknown';
+class _SmsSyncCardState extends ConsumerState<_SmsSyncCard> {
+  bool _isLoading = false;
+  bool _hasSmsPermission = false;
+  bool _autoSyncEnabled = false;
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    _checkPermission();
+    _loadPreferences();
   }
 
-  Future<void> _loadSettings() async {
-    final channelService = NotificationChannelService();
-
-    final isEnabled = await channelService.isAutoAddEnabled();
-    final hasAccess = await channelService.isNotificationAccessEnabled();
-    final hasBattery = await channelService.isBatteryOptimizationDisabled();
-    final manufacturer = await channelService.getDeviceManufacturer();
-
-    if (mounted) {
-      setState(() {
-        _isAutoAddEnabled = isEnabled;
-        _hasNotificationAccess = hasAccess;
-        _hasBatteryOptimization = hasBattery;
-        _deviceManufacturer = manufacturer;
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _toggleAutoAdd(bool value) async {
-    final channelService = NotificationChannelService();
-    await channelService.setAutoAddEnabled(value);
+  Future<void> _checkPermission() async {
+    final status = await Permission.sms.status;
     setState(() {
-      _isAutoAddEnabled = value;
+      _hasSmsPermission = status.isGranted;
     });
   }
 
-  Future<void> _openNotificationSettings() async {
-    final channelService = NotificationChannelService();
-    await channelService.openNotificationSettings();
-    await Future.delayed(const Duration(milliseconds: 1000));
-    await _loadSettings();
+  Future<void> _loadPreferences() async {
+    final prefService = SmsSyncPreferenceService();
+    await prefService.init();
+    final prefs = prefService.getPreferences();
+    setState(() {
+      _autoSyncEnabled = prefs.preference != SyncPreference.none;
+    });
   }
 
-  Future<void> _openBatterySettings() async {
-    final channelService = NotificationChannelService();
-    await channelService.requestBatteryOptimizationExemption();
-    await Future.delayed(const Duration(milliseconds: 1000));
-    await _loadSettings();
+  Future<void> _toggleAutoSync(bool value) async {
+    final prefService = SmsSyncPreferenceService();
+    await prefService.init();
+
+    if (value) {
+      await prefService.setPreference(SyncPreference.upcoming);
+      await prefService.setSyncOnAppOpen(true);
+    } else {
+      await prefService.setPreference(SyncPreference.none);
+    }
+
+    await _loadPreferences();
   }
 
-  Future<void> _openAutoStartSettings() async {
-    final channelService = NotificationChannelService();
-    await channelService.openAutoStartSettings();
-  }
+  Future<void> _syncNow() async {
+    if (!_hasSmsPermission) {
+      final status = await Permission.sms.request();
+      if (status != PermissionStatus.granted) return;
+      setState(() => _hasSmsPermission = true);
+    }
 
-  Future<void> _resetOnboarding() async {
-    final box = Hive.box('app_box');
-    await box.put('notification_onboarding_completed', false);
-    if (mounted) {
-      final result = await showNotificationOnboarding(context);
-      if (result == true) {
-        await _loadSettings();
+    setState(() => _isLoading = true);
+
+    try {
+      final user = ref.read(authControllerProvider);
+      if (user == null) return;
+
+      final dbService = DatabaseService();
+      await dbService.init();
+      final transactionService = TransactionService(dbService);
+      final parser = TransactionParser();
+      final smsService =
+          SmsTransactionService(dbService, transactionService, parser);
+
+      final addedCount = await smsService.syncSmsTransactions(
+        user.id,
+        fromDate: null,
+        toDate: DateTime.now(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              addedCount > 0
+                  ? '$addedCount new transaction${addedCount > 1 ? 's' : ''} added from SMS'
+                  : 'No new transactions found',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error syncing SMS: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Container(
-        height: 120,
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardTheme.color,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    final isFullyConfigured = _hasNotificationAccess && _hasBatteryOptimization;
-
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
@@ -688,136 +694,63 @@ class _NotificationSettingsCardState
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: _isAutoAddEnabled
-                    ? Colors.green.withValues(alpha: 0.1)
-                    : Colors.grey.withValues(alpha: 0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
-                _isAutoAddEnabled
-                    ? Icons.notifications_active
-                    : Icons.notifications_off,
-                color: _isAutoAddEnabled ? Colors.green : Colors.grey,
+                _hasSmsPermission ? Icons.sync : Icons.sync_disabled,
+                color: Colors.blue,
               ),
             ),
-            title: const Text('Auto-Detect Transactions'),
+            title: const Text('SMS Sync'),
             subtitle: Text(
-              _isAutoAddEnabled
-                  ? 'Automatically add transactions from notifications'
-                  : 'Disabled - transactions will not be auto-added',
+              _hasSmsPermission
+                  ? _autoSyncEnabled
+                      ? 'Auto-detecting transactions from SMS'
+                      : 'Manual sync only'
+                  : 'SMS permission required',
             ),
-            trailing: Switch(
-              value: _isAutoAddEnabled,
-              onChanged: _toggleAutoAdd,
-            ),
+            trailing: _isLoading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : FilledButton.tonal(
+                    onPressed: _syncNow,
+                    child: const Text('Sync'),
+                  ),
           ),
-          if (_isAutoAddEnabled) ...[
-            const Divider(height: 1, indent: 72),
-            _StatusTile(
-              icon: Icons.notifications,
-              title: 'Notification Access',
-              isEnabled: _hasNotificationAccess,
-              statusText: _hasNotificationAccess ? 'Enabled' : 'Disabled',
-              onTap: _openNotificationSettings,
-            ),
-            const Divider(height: 1, indent: 72),
-            _StatusTile(
-              icon: Icons.battery_charging_full,
-              title: 'Battery Optimization',
-              isEnabled: _hasBatteryOptimization,
-              statusText: _hasBatteryOptimization ? 'Disabled' : 'Active',
-              onTap: _openBatterySettings,
-            ),
-            if (_deviceManufacturer != 'xiaomi' &&
-                _deviceManufacturer != 'redmi' &&
-                _deviceManufacturer != 'huawei' &&
-                _deviceManufacturer != 'honor' &&
-                _deviceManufacturer != 'oppo' &&
-                _deviceManufacturer != 'realme' &&
-                _deviceManufacturer != 'vivo' &&
-                _deviceManufacturer != 'oneplus' &&
-                _deviceManufacturer != 'samsung' &&
-                _deviceManufacturer != 'asus') ...[
-              const Divider(height: 1, indent: 72),
-              _StatusTile(
-                icon: Icons.power_settings_new,
-                title: 'Auto-Start',
-                isEnabled: true,
-                statusText: 'Not required',
-                onTap: null,
-              ),
-            ] else ...[
-              const Divider(height: 1, indent: 72),
-              _StatusTile(
-                icon: Icons.power_settings_new,
-                title: 'Auto-Start Settings',
-                isEnabled: true,
-                statusText: 'Configure for ${_getManufacturerName()}',
-                onTap: _openAutoStartSettings,
-              ),
-            ],
+          if (_hasSmsPermission) ...[
             const Divider(height: 1, indent: 72),
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        isFullyConfigured
-                            ? Icons.check_circle
-                            : Icons.warning_amber,
-                        size: 16,
-                        color: isFullyConfigured ? Colors.green : Colors.orange,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isFullyConfigured
-                            ? 'All permissions configured'
-                            : 'Some permissions need attention',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isFullyConfigured
-                                  ? Colors.green
-                                  : Colors.orange,
-                              fontWeight: FontWeight.w500,
-                            ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primaryContainer
-                              .withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Auto-Sync',
+                          style: Theme.of(context).textTheme.titleSmall,
                         ),
-                        child: Text(
-                          '${NotificationApps.defaultApps.length} apps monitored',
+                        const SizedBox(height: 4),
+                        Text(
+                          'Automatically sync new SMS transactions',
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: Theme.of(context)
                                         .colorScheme
-                                        .onPrimaryContainer,
+                                        .onSurfaceVariant,
                                   ),
                         ),
-                      ),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: _resetOnboarding,
-                        icon: const Icon(Icons.refresh, size: 16),
-                        label: const Text('Re-setup'),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _autoSyncEnabled,
+                    onChanged: _toggleAutoSync,
                   ),
                 ],
               ),
@@ -825,80 +758,6 @@ class _NotificationSettingsCardState
           ],
         ],
       ),
-    );
-  }
-
-  String _getManufacturerName() {
-    final manufacturer = _deviceManufacturer.toLowerCase();
-    final names = {
-      'xiaomi': 'Xiaomi',
-      'redmi': 'Redmi',
-      'samsung': 'Samsung',
-      'huawei': 'Huawei',
-      'honor': 'Honor',
-      'oppo': 'OPPO',
-      'realme': 'Realme',
-      'vivo': 'Vivo',
-      'oneplus': 'OnePlus',
-      'asus': 'ASUS',
-    };
-    for (final entry in names.entries) {
-      if (manufacturer.contains(entry.key)) {
-        return entry.value;
-      }
-    }
-    return _deviceManufacturer;
-  }
-}
-
-class _StatusTile extends StatelessWidget {
-  const _StatusTile({
-    required this.icon,
-    required this.title,
-    required this.isEnabled,
-    required this.statusText,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final bool isEnabled;
-  final String statusText;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isEnabled
-              ? Colors.green.withValues(alpha: 0.1)
-              : Colors.orange.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(
-          icon,
-          color: isEnabled ? Colors.green : Colors.orange,
-          size: 20,
-        ),
-      ),
-      title: Text(title),
-      subtitle: Text(statusText),
-      trailing: onTap != null
-          ? TextButton(
-              onPressed: onTap,
-              child: Text(
-                isEnabled ? 'Settings' : 'Enable',
-                style: TextStyle(
-                  color: isEnabled
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.orange,
-                ),
-              ),
-            )
-          : null,
-      onTap: onTap,
     );
   }
 }
