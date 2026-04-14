@@ -8,10 +8,12 @@ import '../models/app_user.dart';
 import '../models/budget_model.dart';
 import '../models/transaction_model.dart';
 import '../providers/app_providers.dart';
+import '../services/notification_service.dart';
 import '../services/sms_sync_manager.dart';
 import '../services/sms_sync_preference_service.dart';
 import 'budget/budget_settings_sheet.dart';
 import 'dashboard/dashboard_view.dart';
+import 'onboarding/notification_permission_dialog.dart';
 import 'onboarding/sms_sync_dialog.dart';
 import '../../services/permission_service.dart';
 import 'reports/reports_view.dart';
@@ -28,7 +30,8 @@ class HomeShell extends ConsumerStatefulWidget {
   ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends ConsumerState<HomeShell> {
+class _HomeShellState extends ConsumerState<HomeShell>
+    with WidgetsBindingObserver {
   int _index = 0;
   bool _initialized = false;
 
@@ -42,9 +45,30 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initialize();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _onAppResumed();
+    }
+  }
+
+  Future<void> _onAppResumed() async {
+    final syncManagerAsync = await ref.read(smsSyncManagerProvider.future);
+    await syncManagerAsync.setLastAppOpenTime(DateTime.now());
+    await syncManagerAsync.onAppOpen();
+    await syncManagerAsync.checkAndSendReminder();
   }
 
   Future<void> _initialize() async {
@@ -55,6 +79,44 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         .load(widget.user.id);
     _checkBudgetAlerts();
     await _checkSmsSync();
+    await _checkNotificationPermission();
+    _onAppResumed();
+  }
+
+  Future<void> _checkNotificationPermission() async {
+    final syncManagerAsync = await ref.read(smsSyncManagerProvider.future);
+    final prefs = syncManagerAsync.getPreferences();
+
+    if (!prefs.notificationPermissionAsked) {
+      final result = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const NotificationPermissionDialog(),
+      );
+
+      if (result == true) {
+        await NotificationService.instance.requestPermission();
+      }
+
+      await syncManagerAsync.setNotificationPermissionAsked(true);
+
+      final granted = await NotificationService.instance.isPermissionGranted();
+      if (!granted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Enable notifications in Settings to receive reminders'),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: () {
+                setState(() => _index = 3);
+              },
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _checkSmsSync() async {
@@ -148,6 +210,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     );
     if (result is! TransactionModel) return;
     await ref.read(transactionsControllerProvider.notifier).upsert(result);
+    final syncManagerAsync = await ref.read(smsSyncManagerProvider.future);
+    await syncManagerAsync.setLastManualTransactionTime(DateTime.now());
   }
 
   @override

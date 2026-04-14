@@ -14,6 +14,12 @@ class SmsSyncPreferences {
     this.periodicSyncEnabled = false,
     this.syncOnAppOpen = true,
     this.previousSyncCompleted = false,
+    this.reminderEnabled = true,
+    this.lastAppOpenTime,
+    this.lastReminderSentTime,
+    this.lastManualTransactionTime,
+    this.pausedReminderTime,
+    this.notificationPermissionAsked = false,
   });
 
   SyncPreference preference;
@@ -22,6 +28,12 @@ class SmsSyncPreferences {
   bool periodicSyncEnabled;
   bool syncOnAppOpen;
   bool previousSyncCompleted;
+  bool reminderEnabled;
+  DateTime? lastAppOpenTime;
+  DateTime? lastReminderSentTime;
+  DateTime? lastManualTransactionTime;
+  DateTime? pausedReminderTime;
+  bool notificationPermissionAsked;
 
   Map<String, dynamic> toMap() => {
         'preference': preference.name,
@@ -30,6 +42,13 @@ class SmsSyncPreferences {
         'periodicSyncEnabled': periodicSyncEnabled,
         'syncOnAppOpen': syncOnAppOpen,
         'previousSyncCompleted': previousSyncCompleted,
+        'reminderEnabled': reminderEnabled,
+        'lastAppOpenTime': lastAppOpenTime?.toIso8601String(),
+        'lastReminderSentTime': lastReminderSentTime?.toIso8601String(),
+        'lastManualTransactionTime':
+            lastManualTransactionTime?.toIso8601String(),
+        'pausedReminderTime': pausedReminderTime?.toIso8601String(),
+        'notificationPermissionAsked': notificationPermissionAsked,
       };
 
   factory SmsSyncPreferences.fromMap(Map<dynamic, dynamic> map) {
@@ -47,6 +66,20 @@ class SmsSyncPreferences {
       periodicSyncEnabled: map['periodicSyncEnabled'] ?? false,
       syncOnAppOpen: map['syncOnAppOpen'] ?? true,
       previousSyncCompleted: map['previousSyncCompleted'] ?? false,
+      reminderEnabled: map['reminderEnabled'] ?? true,
+      lastAppOpenTime: map['lastAppOpenTime'] != null
+          ? DateTime.parse(map['lastAppOpenTime'])
+          : null,
+      lastReminderSentTime: map['lastReminderSentTime'] != null
+          ? DateTime.parse(map['lastReminderSentTime'])
+          : null,
+      lastManualTransactionTime: map['lastManualTransactionTime'] != null
+          ? DateTime.parse(map['lastManualTransactionTime'])
+          : null,
+      pausedReminderTime: map['pausedReminderTime'] != null
+          ? DateTime.parse(map['pausedReminderTime'])
+          : null,
+      notificationPermissionAsked: map['notificationPermissionAsked'] ?? false,
     );
   }
 }
@@ -108,6 +141,42 @@ class SmsSyncPreferenceService {
   Future<void> setPreviousSyncCompleted(bool completed) async {
     final prefs = getPreferences();
     prefs.previousSyncCompleted = completed;
+    await savePreferences(prefs);
+  }
+
+  Future<void> setReminderEnabled(bool enabled) async {
+    final prefs = getPreferences();
+    prefs.reminderEnabled = enabled;
+    await savePreferences(prefs);
+  }
+
+  Future<void> setLastAppOpenTime(DateTime time) async {
+    final prefs = getPreferences();
+    prefs.lastAppOpenTime = time;
+    await savePreferences(prefs);
+  }
+
+  Future<void> setLastReminderSentTime(DateTime time) async {
+    final prefs = getPreferences();
+    prefs.lastReminderSentTime = time;
+    await savePreferences(prefs);
+  }
+
+  Future<void> setLastManualTransactionTime(DateTime time) async {
+    final prefs = getPreferences();
+    prefs.lastManualTransactionTime = time;
+    await savePreferences(prefs);
+  }
+
+  Future<void> setPausedReminderTime(DateTime? time) async {
+    final prefs = getPreferences();
+    prefs.pausedReminderTime = time;
+    await savePreferences(prefs);
+  }
+
+  Future<void> setNotificationPermissionAsked(bool asked) async {
+    final prefs = getPreferences();
+    prefs.notificationPermissionAsked = asked;
     await savePreferences(prefs);
   }
 

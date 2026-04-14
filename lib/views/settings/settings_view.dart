@@ -13,6 +13,7 @@ import '../../services/database_service.dart';
 import '../../services/sms_sync_preference_service.dart';
 import '../../services/transaction_service.dart';
 import '../../services/sms_transaction_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/permission_service.dart';
 import '../../services/transaction_parser.dart';
 import '../budget/budget_settings_sheet.dart';
@@ -577,11 +578,14 @@ class _SmsSyncCardState extends ConsumerState<_SmsSyncCard> {
   bool _isLoading = false;
   bool _hasSmsPermission = false;
   bool _autoSyncEnabled = false;
+  bool _reminderEnabled = true;
+  bool _hasNotificationPermission = false;
 
   @override
   void initState() {
     super.initState();
     _checkPermission();
+    _checkNotificationPermission();
     _loadPreferences();
   }
 
@@ -592,12 +596,20 @@ class _SmsSyncCardState extends ConsumerState<_SmsSyncCard> {
     });
   }
 
+  Future<void> _checkNotificationPermission() async {
+    final granted = await NotificationService.instance.isPermissionGranted();
+    setState(() {
+      _hasNotificationPermission = granted;
+    });
+  }
+
   Future<void> _loadPreferences() async {
     final prefService = SmsSyncPreferenceService();
     await prefService.init();
     final prefs = prefService.getPreferences();
     setState(() {
       _autoSyncEnabled = prefs.preference != SyncPreference.none;
+      _reminderEnabled = prefs.reminderEnabled;
     });
   }
 
@@ -613,6 +625,15 @@ class _SmsSyncCardState extends ConsumerState<_SmsSyncCard> {
     }
 
     await _loadPreferences();
+  }
+
+  Future<void> _toggleReminder(bool value) async {
+    final prefService = SmsSyncPreferenceService();
+    await prefService.init();
+    await prefService.setReminderEnabled(value);
+    setState(() {
+      _reminderEnabled = value;
+    });
   }
 
   Future<void> _syncNow() async {
@@ -759,6 +780,78 @@ class _SmsSyncCardState extends ConsumerState<_SmsSyncCard> {
                 ],
               ),
             ),
+            const Divider(height: 1, indent: 72),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Daily Reminders',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Remind me every 4 hours to add transactions',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _reminderEnabled,
+                    onChanged: _toggleReminder,
+                  ),
+                ],
+              ),
+            ),
+            if (!_hasNotificationPermission) ...[
+              const Divider(height: 1, indent: 72),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Notifications Disabled',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Enable in Settings to receive reminders',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlinedButton(
+                      onPressed: () => openAppSettings(),
+                      child: const Text('Settings'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ],
       ),

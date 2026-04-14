@@ -166,11 +166,91 @@ class SmsSyncManager {
 
   Future<void> showSyncNotification(BuildContext context, int count) async {
     if (count > 0) {
-      await _notificationService.showTransactionAddedNotification(
-        context,
-        count,
-      );
+      await _notificationService.showDelayedTransactionNotification(count);
     }
+  }
+
+  DateTime _getNextScheduledReminderTime(DateTime now) {
+    final today2PM = DateTime(now.year, now.month, now.day, 14);
+    final today6PM = DateTime(now.year, now.month, now.day, 18);
+    final today10PM = DateTime(now.year, now.month, now.day, 22);
+
+    if (now.isBefore(today2PM)) return today2PM;
+    if (now.isBefore(today6PM)) return today6PM;
+    if (now.isBefore(today10PM)) return today10PM;
+    return today2PM.add(const Duration(days: 1));
+  }
+
+  DateTime? _getLastActivityTime(SmsSyncPreferences prefs) {
+    DateTime? lastActivity = prefs.lastAppOpenTime;
+    final lastTransaction = prefs.lastManualTransactionTime;
+    if (lastTransaction != null) {
+      if (lastActivity == null || lastTransaction.isAfter(lastActivity)) {
+        lastActivity = lastTransaction;
+      }
+    }
+    return lastActivity;
+  }
+
+  Future<void> checkAndSendReminder() async {
+    final prefs = getPreferences();
+    if (!prefs.reminderEnabled) return;
+    if (_notificationService.isQuietHours()) return;
+
+    final now = DateTime.now();
+    final scheduledTime = _getNextScheduledReminderTime(now);
+
+    final reminderHour = scheduledTime.hour;
+    if (now.hour < reminderHour) return;
+
+    final lastActivity = _getLastActivityTime(prefs);
+    if (lastActivity != null) {
+      final hoursSinceActivity = now.difference(lastActivity).inHours;
+      if (hoursSinceActivity < 3) return;
+    }
+
+    await _preferenceService.setLastReminderSentTime(now);
+    await _preferenceService.setPausedReminderTime(null);
+    await _notificationService.showReminderNotification();
+  }
+
+  Future<void> onAppOpen() async {
+    final prefs = getPreferences();
+    final now = DateTime.now();
+
+    if (!_notificationService.isQuietHours() &&
+        prefs.pausedReminderTime != null) {
+      final pausedAt = prefs.pausedReminderTime!;
+      final pauseDuration = now.difference(pausedAt);
+
+      if (pauseDuration.inHours >= 4) {
+        await _preferenceService.setLastReminderSentTime(now);
+        await _preferenceService.setPausedReminderTime(null);
+        await _notificationService.showReminderNotification();
+      } else {
+        await _preferenceService.setPausedReminderTime(null);
+      }
+    }
+  }
+
+  Future<void> setLastManualTransactionTime(DateTime time) async {
+    await _preferenceService.setLastManualTransactionTime(time);
+  }
+
+  Future<void> setReminderEnabled(bool enabled) async {
+    await _preferenceService.setReminderEnabled(enabled);
+  }
+
+  bool get isReminderEnabled {
+    return getPreferences().reminderEnabled;
+  }
+
+  Future<void> setLastAppOpenTime(DateTime time) async {
+    await _preferenceService.setLastAppOpenTime(time);
+  }
+
+  Future<void> setNotificationPermissionAsked(bool asked) async {
+    await _preferenceService.setNotificationPermissionAsked(asked);
   }
 
   Future<void> savePreference(SyncPreference preference,

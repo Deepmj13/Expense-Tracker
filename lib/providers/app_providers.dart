@@ -121,16 +121,8 @@ class AuthController extends StateNotifier<AppUser?> {
     _hydrationNotifier.setHydrated();
   }
 
-  Future<bool> login(String email, String password) async {
-    final user = await _authService.login(email: email, password: password);
-    state = user;
-    return user != null;
-  }
-
-  Future<bool> signup(
-      String name, String email, String password, Country country) async {
-    final user = await _authService.signup(
-        name: name, email: email, password: password, country: country);
+  Future<bool> signup(String name, Country country) async {
+    final user = await _authService.signup(name: name, country: country);
     state = user;
     return user != null;
   }

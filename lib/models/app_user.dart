@@ -41,7 +41,6 @@ class AppUser {
   const AppUser({
     required this.id,
     required this.name,
-    required this.email,
     required this.country,
     required this.currencySymbol,
     this.sessionToken,
@@ -49,7 +48,6 @@ class AppUser {
 
   final String id;
   final String name;
-  final String email;
   final String country;
   final String currencySymbol;
   final String? sessionToken;
@@ -57,7 +55,6 @@ class AppUser {
   AppUser copyWith({
     String? id,
     String? name,
-    String? email,
     String? country,
     String? currencySymbol,
     String? sessionToken,
@@ -65,7 +62,6 @@ class AppUser {
     return AppUser(
       id: id ?? this.id,
       name: name ?? this.name,
-      email: email ?? this.email,
       country: country ?? this.country,
       currencySymbol: currencySymbol ?? this.currencySymbol,
       sessionToken: sessionToken ?? this.sessionToken,
@@ -75,7 +71,6 @@ class AppUser {
   Map<String, dynamic> toMap() => {
         'id': id,
         'name': name,
-        'email': email,
         'country': country,
         'currencySymbol': currencySymbol,
         'sessionToken': sessionToken,
@@ -84,7 +79,6 @@ class AppUser {
   factory AppUser.fromMap(Map<dynamic, dynamic> map) => AppUser(
         id: map['id'] as String,
         name: map['name'] as String,
-        email: map['email'] as String,
         country: map['country'] as String? ?? 'India',
         currencySymbol: map['currencySymbol'] as String? ?? '₹',
         sessionToken: map['sessionToken'] as String?,

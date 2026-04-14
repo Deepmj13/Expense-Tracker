@@ -9,7 +9,7 @@ import 'services/notification_service.dart';
 import 'services/sms_background_sync_service.dart';
 import 'views/auth/auth_wrapper.dart';
 import 'views/home_shell.dart';
-import 'views/splash_screen.dart';
+import 'views/loading_view.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -42,12 +42,8 @@ final _routerProvider = Provider<GoRouter>((ref) {
   final isHydrated = ref.watch(isAuthHydratedProvider);
   return GoRouter(
     navigatorKey: navigatorKey,
-    initialLocation: '/splash',
+    initialLocation: '/auth',
     routes: [
-      GoRoute(
-        path: '/splash',
-        builder: (_, __) => const SplashScreen(),
-      ),
       GoRoute(
         path: '/auth',
         builder: (_, __) => const AuthWrapper(),
@@ -55,18 +51,17 @@ final _routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/home',
         builder: (_, __) {
-          if (!isHydrated) return const SplashScreen();
+          if (!isHydrated) return const LoadingView();
           if (user == null) return const AuthWrapper();
           return HomeShell(user: user);
         },
       ),
     ],
     redirect: (_, state) {
-      if (!isHydrated) return '/splash';
+      if (!isHydrated) return null;
       final inAuth = state.matchedLocation == '/auth';
-      final inSplash = state.matchedLocation == '/splash';
-      if (user == null && !inAuth && !inSplash) return '/auth';
-      if (user != null && (inAuth || inSplash)) return '/home';
+      if (user == null && !inAuth) return '/auth';
+      if (user != null && inAuth) return '/home';
       return null;
     },
   );

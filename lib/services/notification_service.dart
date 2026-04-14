@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 
 class NotificationService {
   NotificationService._();
@@ -14,6 +16,8 @@ class NotificationService {
 
   Future<void> init() async {
     if (_initialized) return;
+
+    tz_data.initializeTimeZones();
 
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -61,6 +65,26 @@ class NotificationService {
           sound: true,
         );
         return granted ?? false;
+      }
+    }
+    return false;
+  }
+
+  Future<bool> isPermissionGranted() async {
+    if (Platform.isAndroid) {
+      final androidPlugin =
+          _notifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlugin != null) {
+        final enabled = await androidPlugin.areNotificationsEnabled();
+        return enabled ?? false;
+      }
+    } else if (Platform.isIOS) {
+      final iosPlugin = _notifications.resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin>();
+      if (iosPlugin != null) {
+        final result = await iosPlugin.checkPermissions();
+        return result?.isEnabled ?? false;
       }
     }
     return false;
@@ -145,5 +169,94 @@ class NotificationService {
 
   Future<void> cancelAll() async {
     await _notifications.cancelAll();
+  }
+
+  bool isQuietHours() {
+    final hour = DateTime.now().hour;
+    return hour >= 23 || hour < 7;
+  }
+
+  Future<void> showDelayedTransactionNotification(int count) async {
+    if (isQuietHours()) return;
+
+    const androidDetails = AndroidNotificationDetails(
+      'transaction_sync_channel',
+      'Transaction Sync',
+      channelDescription: 'Notifications for auto-added transactions',
+      importance: Importance.high,
+      priority: Priority.high,
+      showWhen: true,
+      enableVibration: true,
+      playSound: false,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    final title =
+        count == 1 ? 'New Transaction Added' : '$count New Transactions Added';
+
+    final body = count == 1
+        ? 'A new transaction has been automatically added from your SMS.'
+        : '$count new transactions have been automatically added from your SMS.';
+
+    final scheduledTime =
+        tz.TZDateTime.now(tz.local).add(const Duration(minutes: 2));
+
+    final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    await _notifications.zonedSchedule(
+      notificationId,
+      title,
+      body,
+      scheduledTime,
+      details,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      payload: 'transaction_sync',
+    );
+  }
+
+  Future<void> showReminderNotification() async {
+    if (isQuietHours()) return;
+
+    const androidDetails = AndroidNotificationDetails(
+      'reminder_channel',
+      'Reminders',
+      channelDescription: 'Reminders to add manual transactions',
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+      showWhen: true,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    await _notifications.show(
+      notificationId,
+      'Time to add transactions!',
+      'Don\'t forget to log your expenses manually.',
+      details,
+      payload: 'reminder',
+    );
   }
 }
