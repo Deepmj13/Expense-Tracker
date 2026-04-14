@@ -241,6 +241,10 @@ final selectedMonthProvider = StateProvider<DateTime>((ref) {
   return DateTime(now.year, now.month);
 });
 
+final selectedYearProvider = StateProvider<int>((ref) {
+  return DateTime.now().year;
+});
+
 final currentBudgetProvider = Provider<BudgetModel?>((ref) {
   final budget = ref.watch(budgetControllerProvider);
   ref.watch(selectedMonthProvider);

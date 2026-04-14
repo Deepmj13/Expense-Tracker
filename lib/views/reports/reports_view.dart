@@ -14,10 +14,14 @@ class ReportsView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(transactionsControllerProvider);
     final currencySymbol = ref.watch(currencySymbolProvider);
+    final selectedMonth = ref.watch(selectedMonthProvider);
+    final selectedYear = ref.watch(selectedYearProvider);
     final expenseItems =
         items.where((e) => e.type == TransactionType.expense).toList();
     final incomeItems =
         items.where((e) => e.type == TransactionType.income).toList();
+
+    final currentYear = selectedYear;
 
     final byCategory = <String, double>{};
     final byPaymentMethod = <PaymentMethod, double>{};
@@ -44,7 +48,9 @@ class ReportsView extends ConsumerWidget {
     }
 
     for (final t in items) {
-      byMonth[t.date.month] = (byMonth[t.date.month] ?? 0) + t.amount;
+      if (t.date.year == currentYear) {
+        byMonth[t.date.month] = (byMonth[t.date.month] ?? 0) + t.amount;
+      }
     }
 
     final currencyFormat =
@@ -106,7 +112,34 @@ class ReportsView extends ConsumerWidget {
             currencyFormat: currencyFormat,
           ),
           const SizedBox(height: 24),
-          _SectionHeader(title: 'Monthly Overview'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _SectionHeader(title: 'Monthly Overview'),
+              DropdownButton<int>(
+                value: selectedYear,
+                underline: const SizedBox(),
+                items: List.generate(6, (index) {
+                  final year = DateTime.now().year - index;
+                  return DropdownMenuItem(
+                    value: year,
+                    child: Text(
+                      '$year',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                    ),
+                  );
+                }),
+                onChanged: (year) {
+                  if (year != null) {
+                    ref.read(selectedYearProvider.notifier).state = year;
+                  }
+                },
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
           _MonthlyChart(byMonth: byMonth, months: months),
         ] else ...[

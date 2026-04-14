@@ -291,21 +291,6 @@ class SettingsView extends ConsumerWidget {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.sms, color: Colors.blue),
-                ),
-                title: const Text('Sync from SMS'),
-                subtitle: const Text('Automatically import bank transactions'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _syncSms(context, ref),
-              ),
-              const Divider(height: 1, indent: 72),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -689,37 +674,53 @@ class _SmsSyncCardState extends ConsumerState<_SmsSyncCard> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                _hasSmsPermission ? Icons.sync : Icons.sync_disabled,
-                color: Colors.blue,
-              ),
-            ),
-            title: const Text('SMS Sync'),
-            subtitle: Text(
-              _hasSmsPermission
-                  ? _autoSyncEnabled
-                      ? 'Auto-detecting transactions from SMS'
-                      : 'Manual sync only'
-                  : 'SMS permission required',
-            ),
-            trailing: _isLoading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : FilledButton.tonal(
-                    onPressed: _syncNow,
-                    child: const Text('Sync'),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  child: Icon(
+                    _hasSmsPermission ? Icons.sync : Icons.sync_disabled,
+                    color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SMS Sync',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _hasSmsPermission
+                            ? _autoSyncEnabled
+                                ? 'Auto-detecting transactions from SMS'
+                                : 'Manual sync only'
+                            : 'SMS permission required',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           if (_hasSmsPermission) ...[
             const Divider(height: 1, indent: 72),
@@ -738,6 +739,8 @@ class _SmsSyncCardState extends ConsumerState<_SmsSyncCard> {
                         const SizedBox(height: 4),
                         Text(
                           'Automatically sync new SMS transactions',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: Theme.of(context)

@@ -23,90 +23,94 @@ class _SmsSyncDialogState extends State<SmsSyncDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.sms,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.sms,
-                    color: Theme.of(context).colorScheme.primary,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Auto-Add Transactions',
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                        ),
+                        Text(
+                          'Automatically detect transactions from bank SMS',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Auto-Add Transactions',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      Text(
-                        'Automatically detect transactions from bank SMS',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                      ),
-                    ],
+                ],
+              ),
+              const SizedBox(height: 24),
+              _buildOption(
+                context,
+                title: 'Add previous transactions',
+                subtitle: 'Import transactions from past SMS messages',
+                icon: Icons.history,
+                value: SmsSyncOption.addPrevious,
+                showDatePicker: true,
+              ),
+              const SizedBox(height: 12),
+              _buildOption(
+                context,
+                title: 'Start from today',
+                subtitle: 'Only add transactions from now onwards',
+                icon: Icons.today,
+                value: SmsSyncOption.startFromToday,
+              ),
+              const SizedBox(height: 12),
+              _buildOption(
+                context,
+                title: "Don't auto-add",
+                subtitle: 'Add transactions manually only',
+                icon: Icons.block,
+                value: SmsSyncOption.dontAdd,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            _buildOption(
-              context,
-              title: 'Add previous transactions',
-              subtitle: 'Import transactions from past SMS messages',
-              icon: Icons.history,
-              value: SmsSyncOption.addPrevious,
-              showDatePicker: true,
-            ),
-            const SizedBox(height: 12),
-            _buildOption(
-              context,
-              title: 'Start from today',
-              subtitle: 'Only add transactions from now onwards',
-              icon: Icons.today,
-              value: SmsSyncOption.startFromToday,
-            ),
-            const SizedBox(height: 12),
-            _buildOption(
-              context,
-              title: "Don't auto-add",
-              subtitle: 'Add transactions manually only',
-              icon: Icons.block,
-              value: SmsSyncOption.dontAdd,
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: 12),
-                FilledButton(
-                  onPressed: () => _onConfirm(context),
-                  child: const Text('Continue'),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 12),
+                  FilledButton(
+                    onPressed: () => _onConfirm(context),
+                    child: const Text('Continue'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
