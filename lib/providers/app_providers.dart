@@ -111,12 +111,14 @@ final currencySymbolProvider = Provider<String>((ref) {
 });
 
 class AuthController extends StateNotifier<AppUser?> {
-  AuthController(this._authService) : super(null);
+  AuthController(this._authService, this._hydrationNotifier) : super(null);
 
   final AuthService _authService;
+  final HydrationNotifier _hydrationNotifier;
 
   Future<void> hydrate() async {
     state = await _authService.getCurrentUser();
+    _hydrationNotifier.setHydrated();
   }
 
   Future<bool> login(String email, String password) async {
@@ -141,7 +143,21 @@ class AuthController extends StateNotifier<AppUser?> {
 
 final authControllerProvider =
     StateNotifierProvider<AuthController, AppUser?>((ref) {
-  return AuthController(ref.read(authServiceProvider));
+  return AuthController(
+    ref.read(authServiceProvider),
+    ref.read(isAuthHydratedProvider.notifier),
+  );
+});
+
+class HydrationNotifier extends StateNotifier<bool> {
+  HydrationNotifier() : super(false);
+
+  void setHydrated() => state = true;
+}
+
+final isAuthHydratedProvider =
+    StateNotifierProvider<HydrationNotifier, bool>((ref) {
+  return HydrationNotifier();
 });
 
 class TransactionFilter {

@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/validators.dart';
 import '../../models/transaction_model.dart';
 import '../../models/transaction_type.dart';
+import '../../providers/app_providers.dart';
 
-class TransactionFormSheet extends StatefulWidget {
+class TransactionFormSheet extends ConsumerStatefulWidget {
   const TransactionFormSheet({super.key, this.initial});
 
   final TransactionModel? initial;
 
   @override
-  State<TransactionFormSheet> createState() => _TransactionFormSheetState();
+  ConsumerState<TransactionFormSheet> createState() =>
+      _TransactionFormSheetState();
 }
 
-class _TransactionFormSheetState extends State<TransactionFormSheet> {
+class _TransactionFormSheetState extends ConsumerState<TransactionFormSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _title;
   late final TextEditingController _amount;
@@ -124,9 +127,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  widget.initial == null
-                      ? 'Add Transaction'
-                      : 'Edit Transaction',
+                  widget.initial == null ? 'Add' : 'Edit',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -148,9 +149,9 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                   validator: Validators.amount,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Amount',
-                    prefixIcon: Icon(Icons.attach_money),
+                    prefixText: '${ref.watch(currencySymbolProvider)} ',
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -317,9 +318,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: _save,
-                  child: Text(widget.initial == null
-                      ? 'Add Transaction'
-                      : 'Save Changes'),
+                  child: Text(widget.initial == null ? 'Add' : 'Save'),
                 ),
                 const SizedBox(height: 8),
                 TextButton(
