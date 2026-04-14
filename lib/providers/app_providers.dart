@@ -273,6 +273,12 @@ final monthlyIncomeProvider = Provider<double>((ref) {
       .fold(0.0, (sum, t) => sum + t.amount);
 });
 
+final monthlyBalanceProvider = Provider<double>((ref) {
+  final income = ref.watch(monthlyIncomeProvider);
+  final expense = ref.watch(monthlyExpensesProvider);
+  return income - expense;
+});
+
 final budgetProgressProvider = Provider<double>((ref) {
   final budget = ref.watch(currentBudgetProvider);
   final expenses = ref.watch(monthlyExpensesProvider);

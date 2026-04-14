@@ -44,12 +44,11 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
   @override
   Widget build(BuildContext context) {
     final items = ref.watch(transactionsControllerProvider);
-    final service = ref.watch(transactionServiceProvider);
     final currencySymbol = ref.watch(currencySymbolProvider);
     final user = ref.watch(authControllerProvider);
-    final income = service.incomeTotal(items);
-    final expense = service.expenseTotal(items);
-    final balance = income - expense;
+    final balance = ref.watch(monthlyBalanceProvider);
+    final income = ref.watch(monthlyIncomeProvider);
+    final expense = ref.watch(monthlyExpensesProvider);
 
     final recent = items.take(5).toList();
     final currencyFormat =
@@ -175,7 +174,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Total Balance',
+                'Monthly Balance',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 14,
