@@ -13,6 +13,7 @@ import '../../services/database_service.dart';
 import '../../services/sms_sync_preference_service.dart';
 import '../../services/transaction_service.dart';
 import '../../services/sms_transaction_service.dart';
+import '../../services/permission_service.dart';
 import '../../services/transaction_parser.dart';
 import '../budget/budget_settings_sheet.dart';
 import 'feedback_sheet.dart';
@@ -146,7 +147,7 @@ class SettingsView extends ConsumerWidget {
   }
 
   Future<void> _syncSms(BuildContext context, WidgetRef ref) async {
-    final smsPermission = await Permission.sms.request();
+    final smsPermission = await PermissionService.requestSmsPermission(context);
     if (smsPermission != PermissionStatus.granted) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -616,7 +617,7 @@ class _SmsSyncCardState extends ConsumerState<_SmsSyncCard> {
 
   Future<void> _syncNow() async {
     if (!_hasSmsPermission) {
-      final status = await Permission.sms.request();
+      final status = await PermissionService.requestSmsPermission(context);
       if (status != PermissionStatus.granted) return;
       setState(() => _hasSmsPermission = true);
     }

@@ -13,6 +13,7 @@ import '../services/sms_sync_preference_service.dart';
 import 'budget/budget_settings_sheet.dart';
 import 'dashboard/dashboard_view.dart';
 import 'onboarding/sms_sync_dialog.dart';
+import '../../services/permission_service.dart';
 import 'reports/reports_view.dart';
 import 'settings/settings_view.dart';
 import 'transactions/transaction_form_sheet.dart';
@@ -77,7 +78,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
       if (preference == SyncPreference.none) return;
 
-      final status = await Permission.sms.request();
+      final status = await PermissionService.requestSmsPermission(context);
       if (status.isGranted) {
         await _performSmsSync(syncManagerAsync);
       }
