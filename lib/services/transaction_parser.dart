@@ -109,11 +109,18 @@ class TransactionParser {
     } else {
       final debitedPatterns = [
         'debited',
+        'debit',
+        'a/c debited',
+        'ac debited',
         'paid',
+        'payment',
+        'purchased',
         'spent',
         'withdrawn',
         'deducted',
         'payment to',
+        'txn',
+        'card',
       ];
 
       for (final keyword in debitedPatterns) {
@@ -205,7 +212,12 @@ class TransactionParser {
 
     final debitKeywords = [
       'debited',
+      'debit',
+      'a/c debited',
+      'ac debited',
       'paid',
+      'payment',
+      'purchased',
       'spent',
       'withdrawn',
       'deducted',
@@ -215,6 +227,8 @@ class TransactionParser {
       'sent to',
       'transfer from',
       'withdraw',
+      'txn',
+      'card',
     ];
 
     for (final keyword in creditKeywords) {

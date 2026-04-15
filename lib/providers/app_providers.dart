@@ -118,18 +118,32 @@ class AuthController extends StateNotifier<AppUser?> {
 
   Future<void> hydrate() async {
     state = await _authService.getCurrentUser();
+    if (state != null) {
+      await _saveUserIdToPreferences(state!.id);
+    }
     _hydrationNotifier.setHydrated();
   }
 
   Future<bool> signup(String name, Country country) async {
     final user = await _authService.signup(name: name, country: country);
     state = user;
+    if (user != null) {
+      await _saveUserIdToPreferences(user.id);
+    }
     return user != null;
   }
 
   Future<void> logout() async {
     await _authService.logout();
     state = null;
+  }
+
+  Future<void> _saveUserIdToPreferences(String userId) async {
+    try {
+      final prefsService = SmsSyncPreferenceService();
+      await prefsService.init();
+      await prefsService.setLastUserId(userId);
+    } catch (_) {}
   }
 }
 

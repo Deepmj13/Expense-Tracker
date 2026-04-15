@@ -15,6 +15,7 @@ import '../../services/transaction_service.dart';
 import '../../services/sms_transaction_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/permission_service.dart';
+import '../../services/sms_background_sync_service.dart';
 import '../../services/transaction_parser.dart';
 import '../budget/budget_settings_sheet.dart';
 import 'feedback_sheet.dart';
@@ -620,8 +621,20 @@ class _SmsSyncCardState extends ConsumerState<_SmsSyncCard> {
     if (value) {
       await prefService.setPreference(SyncPreference.upcoming);
       await prefService.setSyncOnAppOpen(true);
+      await prefService.setPeriodicSyncEnabled(true);
+      try {
+        await SmsBackgroundSyncService.instance.schedulePeriodicSync();
+      } catch (e) {
+        debugPrint('Failed to schedule periodic sync: $e');
+      }
     } else {
       await prefService.setPreference(SyncPreference.none);
+      await prefService.setPeriodicSyncEnabled(false);
+      try {
+        await SmsBackgroundSyncService.instance.cancelPeriodicSync();
+      } catch (e) {
+        debugPrint('Failed to cancel periodic sync: $e');
+      }
     }
 
     await _loadPreferences();

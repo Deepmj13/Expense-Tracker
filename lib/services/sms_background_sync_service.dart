@@ -1,5 +1,11 @@
 import 'package:flutter/foundation.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:workmanager/workmanager.dart';
+import 'database_service.dart';
+import 'sms_transaction_service.dart';
+import 'sms_sync_preference_service.dart';
+import 'transaction_service.dart';
+import 'transaction_parser.dart';
 
 const String periodicSmsSyncTask = 'periodicSmsSyncTask';
 const String smsSyncTaskName = 'smsSyncTask';
@@ -31,10 +37,95 @@ void callbackDispatcher() {
 
 Future<void> _performPeriodicSync() async {
   debugPrint('Performing periodic SMS sync...');
+
+  try {
+    await Hive.initFlutter();
+
+    final prefsService = SmsSyncPreferenceService();
+    await prefsService.init();
+
+    final prefs = prefsService.getPreferences();
+    final userId = prefs.lastUserId;
+
+    if (userId == null) {
+      debugPrint('No user ID stored, skipping periodic sync');
+      return;
+    }
+
+    await _syncSms(userId, prefsService);
+  } catch (e) {
+    debugPrint('Error in periodic sync: $e');
+  }
 }
 
 Future<void> _performOneTimeSync(Map<String, dynamic>? inputData) async {
   debugPrint('Performing one-time SMS sync...');
+
+  try {
+    await Hive.initFlutter();
+
+    final prefsService = SmsSyncPreferenceService();
+    await prefsService.init();
+
+    final prefs = prefsService.getPreferences();
+    final userId = prefs.lastUserId;
+
+    if (userId == null) {
+      debugPrint('No user ID stored, skipping one-time sync');
+      return;
+    }
+
+    DateTime? fromDate;
+    DateTime? toDate;
+
+    if (inputData != null) {
+      if (inputData['fromDate'] != null) {
+        fromDate = DateTime.tryParse(inputData['fromDate']);
+      }
+      if (inputData['toDate'] != null) {
+        toDate = DateTime.tryParse(inputData['toDate']);
+      }
+    }
+
+    await _syncSms(userId, prefsService, fromDate: fromDate, toDate: toDate);
+  } catch (e) {
+    debugPrint('Error in one-time sync: $e');
+  }
+}
+
+Future<void> _syncSms(
+  String userId,
+  SmsSyncPreferenceService prefsService, {
+  DateTime? fromDate,
+  DateTime? toDate,
+}) async {
+  try {
+    debugPrint('Starting SMS sync for user: $userId');
+
+    final dbService = DatabaseService();
+    await dbService.init();
+
+    final transactionService = TransactionService(dbService);
+    const parser = TransactionParser();
+    final smsService =
+        SmsTransactionService(dbService, transactionService, parser);
+
+    final syncFromDate = fromDate ??
+        prefsService.getPreferences().lastSyncTime ??
+        DateTime.now().subtract(const Duration(hours: 2));
+
+    final addedCount = await smsService.syncSmsTransactions(
+      userId,
+      fromDate: syncFromDate,
+      toDate: toDate ?? DateTime.now(),
+    );
+
+    await prefsService.setLastSyncTime(DateTime.now());
+
+    debugPrint('SMS sync completed. Added: $addedCount transactions');
+  } catch (e) {
+    debugPrint('Error syncing SMS: $e');
+  }
 }
 
 class SmsBackgroundSyncService {
@@ -49,14 +140,13 @@ class SmsBackgroundSyncService {
 
     await Workmanager().initialize(
       callbackDispatcher,
-      isInDebugMode: kDebugMode,
     );
 
     _initialized = true;
   }
 
   Future<void> schedulePeriodicSync({
-    Duration frequency = const Duration(hours: 4),
+    Duration frequency = const Duration(hours: 2),
   }) async {
     await Workmanager().registerPeriodicTask(
       periodicSmsSyncTask,

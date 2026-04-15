@@ -20,6 +20,7 @@ class SmsSyncPreferences {
     this.lastManualTransactionTime,
     this.pausedReminderTime,
     this.notificationPermissionAsked = false,
+    this.lastUserId,
   });
 
   SyncPreference preference;
@@ -34,6 +35,7 @@ class SmsSyncPreferences {
   DateTime? lastManualTransactionTime;
   DateTime? pausedReminderTime;
   bool notificationPermissionAsked;
+  String? lastUserId;
 
   Map<String, dynamic> toMap() => {
         'preference': preference.name,
@@ -49,6 +51,7 @@ class SmsSyncPreferences {
             lastManualTransactionTime?.toIso8601String(),
         'pausedReminderTime': pausedReminderTime?.toIso8601String(),
         'notificationPermissionAsked': notificationPermissionAsked,
+        'lastUserId': lastUserId,
       };
 
   factory SmsSyncPreferences.fromMap(Map<dynamic, dynamic> map) {
@@ -80,6 +83,7 @@ class SmsSyncPreferences {
           ? DateTime.parse(map['pausedReminderTime'])
           : null,
       notificationPermissionAsked: map['notificationPermissionAsked'] ?? false,
+      lastUserId: map['lastUserId'] as String?,
     );
   }
 }
@@ -178,6 +182,16 @@ class SmsSyncPreferenceService {
     final prefs = getPreferences();
     prefs.notificationPermissionAsked = asked;
     await savePreferences(prefs);
+  }
+
+  Future<void> setLastUserId(String userId) async {
+    final prefs = getPreferences();
+    prefs.lastUserId = userId;
+    await savePreferences(prefs);
+  }
+
+  String? getLastUserId() {
+    return getPreferences().lastUserId;
   }
 
   Future<void> clearPreferences() async {
