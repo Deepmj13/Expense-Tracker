@@ -110,6 +110,7 @@ class TransactionParser {
       final debitedPatterns = [
         'debited',
         'debit',
+        'dr.',
         'a/c debited',
         'ac debited',
         'paid',
@@ -213,6 +214,7 @@ class TransactionParser {
     final debitKeywords = [
       'debited',
       'debit',
+      'dr.',
       'a/c debited',
       'ac debited',
       'paid',
@@ -271,7 +273,7 @@ class TransactionParser {
     }
 
     if (upiId == null) {
-      final simpleUpiPattern = RegExp(r'([a-z0-9]+@[a-z]{2,})');
+      final simpleUpiPattern = RegExp(r'([a-z0-9\-]+@[a-z0-9]{2,})');
       final match = simpleUpiPattern.firstMatch(lowerText);
       if (match != null) {
         upiId = match.group(1);
