@@ -12,7 +12,6 @@ class DatabaseService {
   Box<String>? _processedSmsBox;
 
   Future<void> init() async {
-    await Hive.initFlutter();
     _usersBox = await Hive.openBox<Map>(usersBoxName);
     _transactionsBox = await Hive.openBox<Map>(transactionsBoxName);
     _appBox = await Hive.openBox(appBoxName);

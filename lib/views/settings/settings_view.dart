@@ -808,7 +808,7 @@ class _SmsSyncCardState extends ConsumerState<_SmsSyncCard> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Remind me every 4 hours to add transactions',
+                          'Remind me every 3 hours to add transactions',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style:

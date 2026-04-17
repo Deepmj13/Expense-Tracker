@@ -72,7 +72,7 @@ class NotificationPermissionDialog extends StatelessWidget {
                   context,
                   icon: Icons.alarm_rounded,
                   title: 'Daily Reminders',
-                  subtitle: "We'll remind you every 4 hours to add expenses",
+                  subtitle: "We'll remind you every 3 hours to add expenses",
                 ),
                 const SizedBox(height: 12),
                 _buildFeatureRow(
