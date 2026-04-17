@@ -69,6 +69,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
     await syncManagerAsync.setLastAppOpenTime(DateTime.now());
     await syncManagerAsync.onAppOpen();
     await syncManagerAsync.checkAndSendReminder();
+    await _performSmsSync(syncManagerAsync, showSnackBar: false);
   }
 
   Future<void> _initialize() async {
@@ -155,11 +156,28 @@ class _HomeShellState extends ConsumerState<HomeShell>
     );
   }
 
-  Future<void> _performSmsSync(SmsSyncManager syncManager) async {
+  Future<void> _performSmsSync(SmsSyncManager syncManager,
+      {bool showSnackBar = true}) async {
+    final isSyncing = ref.read(isSyncingProvider);
+    if (isSyncing) {
+      debugPrint('SMS sync already in progress, skipping');
+      return;
+    }
+
     try {
+      ref.read(isSyncingProvider.notifier).state = true;
+
       final result = await syncManager.syncAll(widget.user.id);
 
-      if (result.addedCount > 0 && mounted) {
+      if (result.hasError && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to sync: ${result.errorMessage}'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+          ),
+        );
+      } else if (result.addedCount > 0 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -178,12 +196,14 @@ class _HomeShellState extends ConsumerState<HomeShell>
         await syncManager.showSyncNotification(context, result.addedCount);
       }
 
-      await ref
-          .read(transactionsControllerProvider.notifier)
-          .load(widget.user.id);
+      if (mounted) {
+        await ref
+            .read(transactionsControllerProvider.notifier)
+            .load(widget.user.id);
+      }
     } catch (e) {
       debugPrint('SMS sync error: $e');
-      if (mounted) {
+      if (mounted && showSnackBar) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to sync: ${e.toString()}'),
@@ -191,6 +211,10 @@ class _HomeShellState extends ConsumerState<HomeShell>
             backgroundColor: Colors.red,
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        ref.read(isSyncingProvider.notifier).state = false;
       }
     }
   }

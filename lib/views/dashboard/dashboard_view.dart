@@ -135,24 +135,48 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                 ],
               ),
             ),
-            IconButton(
-              onPressed: () => _showAddBudget(context, ref, budget?.amount),
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: budget != null
-                      ? Theme.of(context).colorScheme.primaryContainer
-                      : Theme.of(context).colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  budget != null ? Icons.edit : Icons.add_card,
-                  color: budget != null
-                      ? Theme.of(context).colorScheme.onPrimaryContainer
-                      : Theme.of(context).colorScheme.onSecondaryContainer,
-                ),
-              ),
-              tooltip: budget != null ? 'Edit Budget' : 'Set Budget',
+            Consumer(
+              builder: (context, ref, child) {
+                final isSyncing = ref.watch(isSyncingProvider);
+                return IconButton(
+                  onPressed: isSyncing
+                      ? null
+                      : () => _showAddBudget(context, ref, budget?.amount),
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: budget != null
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : Theme.of(context).colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: isSyncing
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          )
+                        : Icon(
+                            budget != null ? Icons.edit : Icons.add_card,
+                            color: budget != null
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSecondaryContainer,
+                          ),
+                  ),
+                  tooltip: isSyncing
+                      ? 'Syncing...'
+                      : budget != null
+                          ? 'Edit Budget'
+                          : 'Set Budget',
+                );
+              },
             ),
           ],
         ),

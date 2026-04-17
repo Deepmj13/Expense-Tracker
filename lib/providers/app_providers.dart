@@ -41,13 +41,14 @@ final smsTransactionServiceProvider = Provider<SmsTransactionService>((ref) {
 final smsSyncManagerProvider = FutureProvider<SmsSyncManager>((ref) async {
   final smsService = ref.watch(smsTransactionServiceProvider);
   final prefService = await ref.watch(smsSyncPreferenceServiceProvider.future);
-  final notifService = NotificationService.instance;
   return SmsSyncManager(
     smsService: smsService,
     preferenceService: prefService,
-    notificationService: notifService,
+    notificationService: NotificationService.instance,
   );
 });
+
+final isSyncingProvider = StateProvider<bool>((ref) => false);
 const _secureStorage = FlutterSecureStorage();
 
 final themeModeProvider =
