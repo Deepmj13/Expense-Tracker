@@ -115,6 +115,7 @@ Future<void> _initializeSync(
         operation) async {
   final prefsService = SmsSyncPreferenceService();
   await prefsService.init();
+  await NotificationService.instance.init();
 
   final prefs = prefsService.getPreferences();
   final userId = prefs.lastUserId;
