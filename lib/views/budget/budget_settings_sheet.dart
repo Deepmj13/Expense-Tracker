@@ -140,7 +140,7 @@ class BudgetAlertBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final alertLevel = ref.watch(budgetAlertProvider);
+    final alertLevel = ref.watch(budgetAlertControllerProvider);
     final budgetController = ref.watch(budgetAlertControllerProvider.notifier);
     final currencySymbol = ref.watch(currencySymbolProvider);
     final budget = ref.watch(currentBudgetProvider);

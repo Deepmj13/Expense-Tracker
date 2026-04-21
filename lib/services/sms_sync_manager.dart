@@ -166,7 +166,7 @@ class SmsSyncManager {
 
   Future<void> showSyncNotification(BuildContext context, int count) async {
     if (count > 0) {
-      await _notificationService.showDelayedTransactionNotification(count);
+      await _notificationService.showTransactionAddedNotification(context, count);
     }
   }
 

@@ -365,10 +365,23 @@ class BudgetAlertController extends StateNotifier<BudgetAlertLevel> {
 
   BudgetAlertLevel? _lastAlert;
 
-  void checkAndUpdateAlert(BudgetAlertLevel newLevel) {
+  void checkAndUpdateAlert(BudgetAlertLevel newLevel, WidgetRef ref) async {
     if (newLevel != _lastAlert && newLevel != BudgetAlertLevel.none) {
       _lastAlert = newLevel;
       state = newLevel;
+
+      if (newLevel == BudgetAlertLevel.exceeded) {
+        final budget = ref.read(currentBudgetProvider);
+        final expenses = ref.read(monthlyExpensesProvider);
+        if (budget != null) {
+          final exceededAmount = expenses - budget.amount;
+          final currencySymbol = ref.read(currencySymbolProvider);
+          await NotificationService.instance.showBudgetExceededNotification(
+            exceededAmount,
+            currencySymbol,
+          );
+        }
+      }
     }
   }
 

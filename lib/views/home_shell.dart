@@ -186,9 +186,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
             behavior: SnackBarBehavior.floating,
             action: SnackBarAction(
               label: 'View',
-              onPressed: () {
-                setState(() {});
-              },
+                onPressed: () {
+                  setState(() => _index = 1);
+                },
             ),
           ),
         );
@@ -222,7 +222,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
   void _checkBudgetAlerts() {
     final alertLevel = ref.read(budgetAlertProvider);
     final alertController = ref.read(budgetAlertControllerProvider.notifier);
-    alertController.checkAndUpdateAlert(alertLevel);
+    alertController.checkAndUpdateAlert(alertLevel, ref);
   }
 
   void _showAddTransaction() async {
@@ -242,7 +242,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final showFab = _index == 0;
-    final alertLevel = ref.watch(budgetAlertProvider);
+    final alertLevel = ref.watch(budgetAlertControllerProvider);
 
     return Scaffold(
       body: SafeArea(

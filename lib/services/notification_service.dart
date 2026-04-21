@@ -262,4 +262,37 @@ class NotificationService {
       payload: 'reminder',
     );
   }
+
+  Future<void> showBudgetExceededNotification(double amount, String currencySymbol) async {
+    const androidDetails = AndroidNotificationDetails(
+      'budget_alert_channel',
+      'Budget Alerts',
+      channelDescription: 'Alerts when you exceed your budget',
+      importance: Importance.high,
+      priority: Priority.high,
+      showWhen: true,
+      enableVibration: true,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    await _notifications.show(
+      notificationId,
+      'Budget Exceeded!',
+      'You\'ve spent $currencySymbol${amount.toStringAsFixed(2)} more than your budget.',
+      details,
+      payload: 'budget_exceeded',
+    );
+  }
 }
