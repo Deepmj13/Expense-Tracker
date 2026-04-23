@@ -20,7 +20,8 @@ class NotificationService {
 
     tz_data.initializeTimeZones();
     final timezoneInfo = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation((timezoneInfo as dynamic).name));
+    final timezoneName = timezoneInfo.identifier;
+    tz.setLocalLocation(tz.getLocation(timezoneName));
 
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -93,10 +94,7 @@ class NotificationService {
     return false;
   }
 
-  Future<void> showTransactionAddedNotification(
-    dynamic context,
-    int count,
-  ) async {
+  Future<void> showTransactionAddedNotification(int count) async {
     const androidDetails = AndroidNotificationDetails(
       'transaction_sync_channel',
       'Transaction Sync',
@@ -252,7 +250,8 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final notificationId =
+        1001; // Constant ID for reminders to replace previous ones
 
     await _notifications.show(
       notificationId,
@@ -263,7 +262,8 @@ class NotificationService {
     );
   }
 
-  Future<void> showBudgetExceededNotification(double amount, String currencySymbol) async {
+  Future<void> showBudgetExceededNotification(
+      double amount, String currencySymbol) async {
     const androidDetails = AndroidNotificationDetails(
       'budget_alert_channel',
       'Budget Alerts',

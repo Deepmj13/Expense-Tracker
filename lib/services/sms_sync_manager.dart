@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'sms_sync_preference_service.dart';
 import 'sms_transaction_service.dart';
 import 'notification_service.dart';
@@ -125,6 +124,10 @@ class SmsSyncManager {
     }
   }
 
+  Future<SmsSyncResult> syncUpcoming(String userId) async {
+    return await _syncUpcoming(userId);
+  }
+
   Future<SmsSyncResult> _syncUpcoming(String userId) async {
     final prefs = getPreferences();
 
@@ -148,29 +151,18 @@ class SmsSyncManager {
     }
   }
 
-  Future<SmsSyncResult> syncNow(String userId) async {
-    try {
-      final addedCount = await _smsService.syncSmsTransactions(
-        userId,
-        fromDate: null,
-        toDate: DateTime.now(),
-      );
-
-      await _preferenceService.setLastSyncTime(DateTime.now());
-
-      return SmsSyncResult(addedCount: addedCount);
-    } catch (e) {
-      return SmsSyncResult(errorMessage: e.toString());
-    }
+  Future<void> syncAndNotifyUpcoming(String userId) async {
+    final result = await syncUpcoming(userId);
+    await showSyncNotification(result.addedCount);
   }
 
-  Future<void> showSyncNotification(BuildContext context, int count) async {
+  Future<void> showSyncNotification(int count) async {
     if (count > 0) {
-      await _notificationService.showTransactionAddedNotification(context, count);
+      await _notificationService.showTransactionAddedNotification(count);
     }
   }
 
-  DateTime _getNextScheduledReminderTime(DateTime now) {
+  DateTime getNextScheduledReminderTime(DateTime now) {
     final today2PM = DateTime(now.year, now.month, now.day, 14);
     final today6PM = DateTime(now.year, now.month, now.day, 18);
     final today10PM = DateTime(now.year, now.month, now.day, 22);
@@ -198,7 +190,7 @@ class SmsSyncManager {
     if (_notificationService.isQuietHours()) return;
 
     final now = DateTime.now();
-    final scheduledTime = _getNextScheduledReminderTime(now);
+    final scheduledTime = getNextScheduledReminderTime(now);
 
     final reminderHour = scheduledTime.hour;
     if (now.hour < reminderHour) return;

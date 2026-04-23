@@ -193,7 +193,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
           ),
         );
 
-        await syncManager.showSyncNotification(context, result.addedCount);
+        await syncManager.showSyncNotification(result.addedCount);
       }
 
       if (mounted) {

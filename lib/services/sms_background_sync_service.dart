@@ -6,6 +6,7 @@ import 'sms_sync_preference_service.dart';
 import 'transaction_service.dart';
 import 'transaction_parser.dart';
 import 'notification_service.dart';
+import 'sms_sync_manager.dart';
 
 const String periodicSmsSyncTask = 'periodicSmsSyncTask';
 const String smsSyncTaskName = 'smsSyncTask';
@@ -40,52 +41,18 @@ Future<void> _performPeriodicSync() async {
 
   try {
     await _initializeSync((prefsService, prefs) async {
-      await _syncSms(prefs.lastUserId!, prefsService);
-      await _checkAndSendReminder(prefsService, prefs);
+      final syncManager = SmsSyncManager(
+        smsService: _createSmsService(),
+        preferenceService: prefsService,
+        notificationService: NotificationService.instance,
+      );
+
+      await syncManager.syncAndNotifyUpcoming(prefs.lastUserId!);
+      await syncManager.checkAndSendReminder();
     });
   } catch (e) {
     debugPrint('Error in periodic sync: $e');
   }
-}
-
-Future<void> _checkAndSendReminder(
-    SmsSyncPreferenceService prefsService, SmsSyncPreferences prefs) async {
-  if (!prefs.reminderEnabled) return;
-
-  if (NotificationService.instance.isQuietHours()) return;
-
-  final now = DateTime.now();
-  DateTime? lastActivity = prefs.lastAppOpenTime;
-  final lastTransaction = prefs.lastManualTransactionTime;
-  if (lastTransaction != null) {
-    if (lastActivity == null || lastTransaction.isAfter(lastActivity)) {
-      lastActivity = lastTransaction;
-    }
-  }
-
-  if (lastActivity != null) {
-    final hoursSinceActivity = now.difference(lastActivity).inHours;
-    if (hoursSinceActivity < 3) return;
-  }
-
-  final scheduledTime = _getNextScheduledReminderTime(now);
-  final reminderHour = scheduledTime.hour;
-  if (now.hour < reminderHour) return;
-
-  await prefsService.setLastReminderSentTime(now);
-  await prefsService.setPausedReminderTime(null);
-  await NotificationService.instance.showReminderNotification();
-}
-
-DateTime _getNextScheduledReminderTime(DateTime now) {
-  final today2PM = DateTime(now.year, now.month, now.day, 14);
-  final today6PM = DateTime(now.year, now.month, now.day, 18);
-  final today10PM = DateTime(now.year, now.month, now.day, 22);
-
-  if (now.isBefore(today2PM)) return today2PM;
-  if (now.isBefore(today6PM)) return today6PM;
-  if (now.isBefore(today10PM)) return today10PM;
-  return today2PM.add(const Duration(days: 1));
 }
 
 Future<void> _performOneTimeSync(Map<String, dynamic>? inputData) async {
@@ -93,6 +60,12 @@ Future<void> _performOneTimeSync(Map<String, dynamic>? inputData) async {
 
   try {
     await _initializeSync((prefsService, prefs) async {
+      final syncManager = SmsSyncManager(
+        smsService: _createSmsService(),
+        preferenceService: prefsService,
+        notificationService: NotificationService.instance,
+      );
+
       final DateTime? fromDate =
           inputData != null && inputData['fromDate'] != null
               ? DateTime.tryParse(inputData['fromDate'] as String)
@@ -101,8 +74,17 @@ Future<void> _performOneTimeSync(Map<String, dynamic>? inputData) async {
           ? DateTime.tryParse(inputData['toDate'] as String)
           : null;
 
-      await _syncSms(prefs.lastUserId!, prefsService,
-          fromDate: fromDate, toDate: toDate);
+      // Use manual sync logic for one-time sync
+      final result = await _syncSmsManual(
+        prefs.lastUserId!,
+        syncManager,
+        fromDate: fromDate,
+        toDate: toDate,
+      );
+
+      if (result.addedCount > 0) {
+        await syncManager.showSyncNotification(result.addedCount);
+      }
     });
   } catch (e) {
     debugPrint('Error in one-time sync: $e');
@@ -128,39 +110,32 @@ Future<void> _initializeSync(
   await operation(prefsService, prefs);
 }
 
-Future<void> _syncSms(
+SmsTransactionService _createSmsService() {
+  final dbService = DatabaseService();
+  // This is a bit tricky because DatabaseService.init() is async
+  // We will call it inside the sync methods or ensure it's initialized.
+  // Let's create a helper for this.
+  return SmsTransactionService(
+      dbService, TransactionService(dbService), const TransactionParser());
+}
+
+Future<SmsSyncResult> _syncSmsManual(
   String userId,
-  SmsSyncPreferenceService prefsService, {
+  SmsSyncManager syncManager, {
   DateTime? fromDate,
   DateTime? toDate,
 }) async {
-  try {
-    debugPrint('Starting SMS sync for user: $userId');
+  final dbService = DatabaseService();
+  await dbService.init();
 
-    final dbService = DatabaseService();
-    await dbService.init();
+  final smsService = _createSmsService();
+  final addedCount = await smsService.syncSmsTransactions(
+    userId,
+    fromDate: fromDate,
+    toDate: toDate ?? DateTime.now(),
+  );
 
-    final transactionService = TransactionService(dbService);
-    const parser = TransactionParser();
-    final smsService =
-        SmsTransactionService(dbService, transactionService, parser);
-
-    final syncFromDate = fromDate ??
-        prefsService.getPreferences().lastSyncTime ??
-        DateTime.now().subtract(const Duration(hours: 2));
-
-    final addedCount = await smsService.syncSmsTransactions(
-      userId,
-      fromDate: syncFromDate,
-      toDate: toDate ?? DateTime.now(),
-    );
-
-    await prefsService.setLastSyncTime(DateTime.now());
-
-    debugPrint('SMS sync completed. Added: $addedCount transactions');
-  } catch (e) {
-    debugPrint('Error syncing SMS: $e');
-  }
+  return SmsSyncResult(addedCount: addedCount);
 }
 
 class SmsBackgroundSyncService {
