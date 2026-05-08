@@ -1,0 +1,543 @@
+================================================================================
+     FLUTTER ANDROID - BACKGROUND NOTIFICATION IMPLEMENTATION PLAN
+================================================================================
+
+Author   : Implementation Guide
+Platform : Android (Flutter)
+Topic    : Push Notifications (App Not Running / Background / Terminated)
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+  1. Overview & Architecture
+  2. Dependencies & Setup
+  3. Firebase Project Configuration
+  4. Android Native Configuration
+  5. Flutter Code Implementation
+  6. Notification Channel Setup
+  7. Handling All App States
+  8. Backend Integration
+  9. Token Management
+ 10. Testing Checklist
+ 11. Common Issues & Fixes
+
+================================================================================
+1. OVERVIEW & ARCHITECTURE
+================================================================================
+
+Goal:
+  Deliver notifications to Android users even when the Flutter app is fully
+  closed (terminated), running in the background, or in the foreground.
+
+How it works:
+  - Firebase Cloud Messaging (FCM) communicates directly with the Android OS.
+  - The OS receives and displays notifications without the app running.
+  - When the user taps the notification, the app is launched and can act on it.
+
+App States:
+  ┌────────────────┬──────────────────────────────┬──────────────────────────┐
+  │   App State    │       Who Handles It         │       Your Action        │
+  ├────────────────┼──────────────────────────────┼──────────────────────────┤
+  │  Foreground    │  onMessage listener           │  Show manually via local │
+  │                │  (app is open)                │  notifications plugin    │
+  ├────────────────┼──────────────────────────────┼──────────────────────────┤
+  │  Background    │  Android OS + FCM             │  System auto-displays it │
+  │                │  (app is open but minimized)  │  Handle tap via callback │
+  ├────────────────┼──────────────────────────────┼──────────────────────────┤
+  │  Terminated    │  Android OS + FCM             │  Use getInitialMessage() │
+  │                │  (app is fully closed)        │  on app cold start       │
+  └────────────────┴──────────────────────────────┴──────────────────────────┘
+
+================================================================================
+2. DEPENDENCIES & SETUP
+================================================================================
+
+Step 1 — Add dependencies to pubspec.yaml:
+
+  dependencies:
+    firebase_core: ^3.x.x
+    firebase_messaging: ^15.x.x
+    flutter_local_notifications: ^17.x.x
+
+Step 2 — Install packages:
+
+  flutter pub get
+
+Step 3 — Install FlutterFire CLI (if not already installed):
+
+  dart pub global activate flutterfire_cli
+
+Step 4 — Connect Flutter app to Firebase:
+
+  flutterfire configure
+
+  This generates: lib/firebase_options.dart (auto-generated, do not edit manually)
+
+================================================================================
+3. FIREBASE PROJECT CONFIGURATION
+================================================================================
+
+Step 1 — Create Firebase project:
+  - Go to https://console.firebase.google.com
+  - Click "Add Project" and follow the setup wizard
+
+Step 2 — Register Android app in Firebase:
+  - In Firebase Console → Project Settings → Add App → Android
+  - Enter your Android package name (e.g., com.example.myapp)
+  - Download the google-services.json file
+
+Step 3 — Place google-services.json:
+  Location: android/app/google-services.json
+  (Must be inside the "app" folder, NOT the root android folder)
+
+Step 4 — Enable Cloud Messaging:
+  - Firebase Console → Cloud Messaging → Enable the API if prompted
+
+================================================================================
+4. ANDROID NATIVE CONFIGURATION
+================================================================================
+
+FILE: android/build.gradle (project-level)
+----------------------------------------------
+Add inside buildscript > dependencies:
+
+  classpath 'com.google.gms:google-services:4.4.0'
+
+
+FILE: android/app/build.gradle (app-level)
+----------------------------------------------
+Add at the very bottom of the file:
+
+  apply plugin: 'com.google.gms.google-services'
+
+Also ensure compileSdkVersion is 34 or higher:
+
+  android {
+      compileSdkVersion 34
+      defaultConfig {
+          minSdkVersion 21
+          targetSdkVersion 34
+      }
+  }
+
+
+FILE: android/app/src/main/AndroidManifest.xml
+----------------------------------------------
+Add inside <application> tag:
+
+  <!-- Default notification channel ID -->
+  <meta-data
+      android:name="com.google.firebase.messaging.default_notification_channel_id"
+      android:value="high_importance_channel" />
+
+  <!-- Default notification icon (create this drawable) -->
+  <meta-data
+      android:name="com.google.firebase.messaging.default_notification_icon"
+      android:resource="@drawable/ic_notification" />
+
+  <!-- Default notification color -->
+  <meta-data
+      android:name="com.google.firebase.messaging.default_notification_color"
+      android:resource="@color/notification_color" />
+
+Add inside <manifest> tag (outside <application>):
+
+  <!-- Required for Android 13+ (API 33+) -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  <uses-permission android:name="android.permission.INTERNET"/>
+
+
+FILE: android/app/src/main/res/drawable/ic_notification.xml
+----------------------------------------------
+Create a white vector icon for use as notification icon.
+(Use Android Studio's Asset Studio to generate one)
+
+Example (simple bell icon):
+
+  <?xml version="1.0" encoding="utf-8"?>
+  <vector xmlns:android="http://schemas.android.com/apk/res/android"
+      android:width="24dp"
+      android:height="24dp"
+      android:viewportWidth="24"
+      android:viewportHeight="24"
+      android:tint="#FFFFFF">
+    <path android:fillColor="@android:color/white"
+        android:pathData="M12,22c1.1,0 2,-0.9 2,-2h-4c0,1.1 0.9,2 2,2z
+                          M18,16v-5c0,-3.07 -1.64,-5.64 -4.5,-6.32V4c0,-0.83
+                          -0.67,-1.5 -1.5,-1.5s-1.5,0.67 -1.5,1.5v0.68
+                          C7.63,5.36 6,7.92 6,11v5l-2,2v1h16v-1l-2,-2z"/>
+  </vector>
+
+
+FILE: android/app/src/main/res/values/colors.xml
+----------------------------------------------
+Add notification color:
+
+  <?xml version="1.0" encoding="utf-8"?>
+  <resources>
+      <color name="notification_color">#FF6200EE</color>
+  </resources>
+
+================================================================================
+5. FLUTTER CODE IMPLEMENTATION
+================================================================================
+
+FILE: lib/main.dart
+----------------------------------------------
+
+  import 'package:firebase_core/firebase_core.dart';
+  import 'package:firebase_messaging/firebase_messaging.dart';
+  import 'package:flutter/material.dart';
+  import 'firebase_options.dart';
+  import 'notification_service.dart';
+
+  // IMPORTANT: Must be a top-level function (not inside any class)
+  @pragma('vm:entry-point')
+  Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    print('Background message received: ${message.messageId}');
+    // Do NOT show UI here — only run lightweight logic
+    // Heavy work should be delegated to a workmanager or isolate
+  }
+
+  void main() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+    // Register the background message handler BEFORE runApp
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // Initialize notification service
+    await NotificationService.initialize();
+
+    runApp(const MyApp());
+  }
+
+
+FILE: lib/notification_service.dart
+----------------------------------------------
+
+  import 'package:firebase_messaging/firebase_messaging.dart';
+  import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+  class NotificationService {
+    static final FlutterLocalNotificationsPlugin _localNotifications =
+        FlutterLocalNotificationsPlugin();
+
+    static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
+      'high_importance_channel',   // Must match AndroidManifest.xml meta-data
+      'High Importance Notifications',
+      description: 'Used for important notifications',
+      importance: Importance.high,
+      playSound: true,
+    );
+
+    static Future<void> initialize() async {
+      // Create notification channel on Android
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(_channel);
+
+      // Initialize local notifications plugin
+      const AndroidInitializationSettings androidSettings =
+          AndroidInitializationSettings('@drawable/ic_notification');
+
+      const InitializationSettings settings =
+          InitializationSettings(android: androidSettings);
+
+      await _localNotifications.initialize(
+        settings,
+        onDidReceiveNotificationResponse: _onNotificationTapped,
+      );
+
+      // Request permission from user
+      await _requestPermission();
+
+      // Get and print device token
+      await _getToken();
+
+      // Set up message listeners
+      _setupListeners();
+    }
+
+    static Future<void> _requestPermission() async {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      NotificationSettings settings = await messaging.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
+      );
+
+      print('Permission status: ${settings.authorizationStatus}');
+    }
+
+    static Future<void> _getToken() async {
+      String? token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        print('FCM Token: $token');
+        // TODO: Send this token to your backend server
+        // await ApiService.sendFcmToken(token);
+      }
+
+      // Listen for token refresh
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+        print('Token refreshed: $newToken');
+        // TODO: Update token on your backend
+        // await ApiService.sendFcmToken(newToken);
+      });
+    }
+
+    static void _setupListeners() {
+      // FOREGROUND: App is open and in use
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print('Foreground message: ${message.notification?.title}');
+        _showLocalNotification(message);
+      });
+
+      // BACKGROUND: App is open but minimized → user taps notification
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        print('Notification tapped from background: ${message.data}');
+        _handleNavigation(message.data);
+      });
+    }
+
+    // TERMINATED: App was closed → opened via notification tap
+    static Future<void> checkInitialMessage() async {
+      RemoteMessage? initialMessage =
+          await FirebaseMessaging.instance.getInitialMessage();
+      if (initialMessage != null) {
+        print('App opened from terminated state via notification');
+        _handleNavigation(initialMessage.data);
+      }
+    }
+
+    static Future<void> _showLocalNotification(RemoteMessage message) async {
+      RemoteNotification? notification = message.notification;
+      if (notification == null) return;
+
+      await _localNotifications.show(
+        notification.hashCode,
+        notification.title,
+        notification.body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channel.id,
+            _channel.name,
+            channelDescription: _channel.description,
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@drawable/ic_notification',
+          ),
+        ),
+        payload: message.data.toString(),
+      );
+    }
+
+    static void _onNotificationTapped(NotificationResponse response) {
+      // Handle local notification tap
+      print('Local notification tapped: ${response.payload}');
+    }
+
+    static void _handleNavigation(Map<String, dynamic> data) {
+      // Example: navigate based on data payload
+      // String? screen = data['screen'];
+      // NavigationService.navigateTo(screen);
+      print('Handle navigation with data: $data');
+    }
+  }
+
+================================================================================
+6. NOTIFICATION CHANNEL SETUP (Android 8+)
+================================================================================
+
+Android 8.0 (API 26+) requires notification channels. Without a channel,
+notifications will NOT appear on modern Android devices.
+
+Channel Properties:
+  - id         : Unique string ID (match with AndroidManifest.xml meta-data)
+  - name       : Visible to user in device Settings > Notifications
+  - importance : Importance.high  → shows as heads-up notification with sound
+                 Importance.low   → no sound, no heads-up
+                 Importance.max   → urgent, intrusive
+
+Best Practice: Create channels once on app startup (safe to call multiple times).
+
+Multiple Channels Example:
+  - "high_importance_channel"  → Alerts, urgent messages
+  - "orders_channel"           → Order updates
+  - "promo_channel"            → Marketing messages (low importance)
+
+================================================================================
+7. HANDLING ALL APP STATES
+================================================================================
+
+FOREGROUND (app is open):
+  - FCM does NOT auto-display the notification
+  - You must call _showLocalNotification() manually
+  - Use onMessage.listen() to catch it
+
+BACKGROUND (app is minimized):
+  - FCM + Android OS displays the notification automatically
+  - User sees it in the status bar
+  - When tapped → onMessageOpenedApp fires
+
+TERMINATED (app is fully closed):
+  - Android OS receives and displays the notification via FCM
+  - User sees it in the status bar / notification drawer
+  - When tapped → app launches cold
+  - Call getInitialMessage() in your first screen's initState to handle it
+
+Example in a screen's initState:
+
+  @override
+  void initState() {
+    super.initState();
+    // Check if app was launched from a notification
+    NotificationService.checkInitialMessage();
+  }
+
+Data-Only Messages (no notification key in payload):
+  - These run _firebaseMessagingBackgroundHandler silently
+  - No UI is shown automatically
+  - Useful for silent sync operations
+
+================================================================================
+8. BACKEND INTEGRATION
+================================================================================
+
+Sending a notification from your server using Firebase Admin SDK (Node.js):
+
+  const admin = require('firebase-admin');
+  const serviceAccount = require('./serviceAccountKey.json');
+
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+
+  // Send to single device
+  await admin.messaging().send({
+    token: '<USER_FCM_TOKEN>',
+    notification: {
+      title: 'Order Shipped!',
+      body: 'Your order #1234 is on the way.'
+    },
+    data: {
+      screen: 'order_details',
+      orderId: '1234'
+    },
+    android: {
+      priority: 'high',
+      notification: {
+        channelId: 'high_importance_channel',
+        icon: 'ic_notification',
+        color: '#FF6200EE',
+        sound: 'default'
+      }
+    }
+  });
+
+  // Send to topic (broadcast to many users)
+  await admin.messaging().send({
+    topic: 'all_users',
+    notification: { title: 'New Update!', body: 'Check out our latest features.' }
+  });
+
+  // Subscribe user to topic
+  await admin.messaging().subscribeToTopic([fcmToken], 'all_users');
+
+================================================================================
+9. TOKEN MANAGEMENT
+================================================================================
+
+What is the FCM Token?
+  - A unique identifier for the device + app combination
+  - Required to target a specific device with a push notification
+  - Can change: app reinstall, OS update, cache cleared
+
+When to save the token:
+  1. On first app launch (after permission is granted)
+  2. Whenever onTokenRefresh fires
+
+Where to save it:
+  - Send to your own backend API
+  - Associate it with the logged-in user's account
+  - Store in your database (e.g., users table: fcm_token column)
+
+Token Lifecycle:
+  ┌─────────────────────────────────────────────────────────┐
+  │  App installs → New token generated                     │
+  │  User logs in → Save token to backend                   │
+  │  Token refreshes → onTokenRefresh → Update backend      │
+  │  User logs out → Delete token from backend              │
+  │  App uninstalls → Token becomes invalid automatically   │
+  └─────────────────────────────────────────────────────────┘
+
+Example token send to backend:
+
+  Future<void> sendTokenToBackend(String token) async {
+    final response = await http.post(
+      Uri.parse('https://yourapi.com/users/fcm-token'),
+      headers: {'Authorization': 'Bearer $userAuthToken'},
+      body: jsonEncode({'fcm_token': token}),
+    );
+    print('Token sent: ${response.statusCode}');
+  }
+
+================================================================================
+10. TESTING CHECKLIST
+================================================================================
+
+  [ ] google-services.json is in android/app/ folder
+  [ ] apply plugin 'com.google.gms.google-services' is at bottom of app/build.gradle
+  [ ] Notification channel ID matches in code and AndroidManifest.xml
+  [ ] @pragma('vm:entry-point') is on background handler function
+  [ ] Background handler is a top-level function (not inside a class)
+  [ ] Firebase.initializeApp() is called in background handler
+  [ ] FCM token is printed/logged on app launch
+  [ ] Test foreground: Send notification while app is open → should show in UI
+  [ ] Test background: Minimize app → send notification → tap it → check navigation
+  [ ] Test terminated: Kill app → send notification → tap → check getInitialMessage()
+  [ ] Android 13 runtime permission: POST_NOTIFICATIONS dialog appears
+  [ ] Notification icon is white/monochrome (colored icons look bad on Android)
+  [ ] Channel appears in Device Settings > Apps > [YourApp] > Notifications
+
+================================================================================
+11. COMMON ISSUES & FIXES
+================================================================================
+
+ISSUE: Notifications not showing on Android 13+
+FIX:   Request POST_NOTIFICATIONS permission at runtime using permission_handler
+       or firebase_messaging.requestPermission()
+
+ISSUE: Background notifications not received
+FIX:   Ensure @pragma('vm:entry-point') is on the handler AND it's top-level
+
+ISSUE: Notification icon shows as grey square
+FIX:   Use a pure white/transparent vector drawable for ic_notification
+       (Android ignores color on notification icons, uses alpha only)
+
+ISSUE: App not navigating on notification tap from terminated state
+FIX:   Call getInitialMessage() in the first screen's initState, not in main()
+
+ISSUE: Token is null
+FIX:   Ensure permissions are granted before calling getToken()
+       Also verify google-services.json is correct and up to date
+
+ISSUE: "Default FirebaseApp is not initialized"
+FIX:   Call Firebase.initializeApp() before any Firebase usage,
+       including inside the background handler
+
+ISSUE: Duplicate notifications in foreground
+FIX:   FCM + local notifications can both fire. Use onMessage to show only
+       local notification; don't send "notification" key from server for
+       foreground — use data-only payload + manual local notification
+
+================================================================================
+END OF DOCUMENT
+================================================================================
