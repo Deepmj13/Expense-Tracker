@@ -54,11 +54,9 @@ class TransactionTile extends ConsumerWidget {
       },
       child: GestureDetector(
         onTap: () => _showTransactionDetails(context, ref),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardTheme.color,
-            borderRadius: BorderRadius.circular(12),
-          ),
+        child: Material(
+          color: Theme.of(context).cardTheme.color,
+          borderRadius: BorderRadius.circular(12),
           child: ListTile(
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

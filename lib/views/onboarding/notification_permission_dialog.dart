@@ -64,32 +64,35 @@ class NotificationPermissionDialog extends StatelessWidget {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                _buildFeatureRow(
-                  context,
-                  icon: Icons.alarm_rounded,
-                  title: 'Daily Reminders',
-                  subtitle: "We'll remind you every 3 hours to add expenses",
-                ),
-                const SizedBox(height: 12),
-                _buildFeatureRow(
-                  context,
-                  icon: Icons.sync_rounded,
-                  title: 'Auto-Sync Alerts',
-                  subtitle:
-                      'Get notified when transactions are detected from SMS',
-                ),
-                const SizedBox(height: 12),
-                _buildFeatureRow(
-                  context,
-                  icon: Icons.bedtime_off_rounded,
-                  title: 'Respectful Timing',
-                  subtitle: 'No notifications between 11 PM and 7 AM',
-                ),
-              ],
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  _buildFeatureRow(
+                    context,
+                    icon: Icons.alarm_rounded,
+                    title: 'Daily Reminders',
+                    subtitle:
+                        "We'll remind you every 3 hours to add expenses",
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFeatureRow(
+                    context,
+                    icon: Icons.sync_rounded,
+                    title: 'Auto-Sync Alerts',
+                    subtitle:
+                        'Get notified when transactions are detected from SMS',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFeatureRow(
+                    context,
+                    icon: Icons.bedtime_off_rounded,
+                    title: 'Respectful Timing',
+                    subtitle: 'No notifications between 11 PM and 7 AM',
+                  ),
+                ],
+              ),
             ),
           ),
           Padding(

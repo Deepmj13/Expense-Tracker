@@ -364,11 +364,9 @@ class SettingsView extends ConsumerWidget {
         const SizedBox(height: 24),
         _SectionHeader(title: 'Help'),
         const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardTheme.color,
-            borderRadius: BorderRadius.circular(16),
-          ),
+        Material(
+          color: Theme.of(context).cardTheme.color,
+          borderRadius: BorderRadius.circular(16),
           child: ListTile(
             leading: Container(
               padding: const EdgeInsets.all(8),
@@ -387,11 +385,9 @@ class SettingsView extends ConsumerWidget {
         const SizedBox(height: 24),
         _SectionHeader(title: 'Account'),
         const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardTheme.color,
-            borderRadius: BorderRadius.circular(16),
-          ),
+        Material(
+          color: Theme.of(context).cardTheme.color,
+          borderRadius: BorderRadius.circular(16),
           child: ListTile(
             leading: Container(
               padding: const EdgeInsets.all(8),

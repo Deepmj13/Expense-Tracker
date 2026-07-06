@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 enum FeedbackType {
@@ -42,9 +41,6 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
   final _feedbackController = TextEditingController();
   FeedbackType _selectedType = FeedbackType.bugReport;
   bool _isSending = false;
-  bool _isSent = false;
-
-  static const _formspreeUrl = 'https://formspree.io/f/YOUR_FORM_ID';
 
   @override
   void dispose() {
@@ -78,90 +74,10 @@ Date: ${DateTime.now().toIso8601String()}
     }
 
     setState(() => _isSending = true);
-
-    try {
-      await http.post(
-        Uri.parse(_formspreeUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: '{\n'
-            '  "subject": "${_selectedType.subjectPrefix} - Expense Tracker App",\n'
-            '  "message": "${_getFormattedFeedback().replaceAll('"', '\\"').replaceAll('\n', '\\n')}"\n'
-            '}',
-      );
-
-      if (mounted) {
-        setState(() {
-          _isSending = false;
-          _isSent = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Feedback sent successfully!'),
-              ],
-            ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.green,
-          ),
-        );
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) Navigator.pop(context);
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isSending = false);
-        _showFallbackOptions();
-      }
+    await _openEmailApp();
+    if (mounted) {
+      setState(() => _isSending = false);
     }
-  }
-
-  void _showFallbackOptions() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.email_outlined, size: 48, color: Colors.orange),
-            const SizedBox(height: 16),
-            Text(
-              'Could not send email directly',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Choose an alternative way to send your feedback:',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                _openEmailApp();
-              },
-              icon: const Icon(Icons.email),
-              label: const Text('Open Email App'),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                _copyToClipboard();
-              },
-              icon: const Icon(Icons.copy),
-              label: const Text('Copy to Clipboard'),
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _openEmailApp() async {
@@ -331,7 +247,7 @@ Date: ${DateTime.now().toIso8601String()}
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
-              onPressed: _isSending || _isSent ? null : _sendFeedback,
+              onPressed: _isSending ? null : _sendFeedback,
               icon: _isSending
                   ? const SizedBox(
                       width: 20,
@@ -341,15 +257,8 @@ Date: ${DateTime.now().toIso8601String()}
                         color: Colors.white,
                       ),
                     )
-                  : Icon(_isSent ? Icons.check : Icons.send),
-              label: Text(_isSent
-                  ? 'Sent!'
-                  : _isSending
-                      ? 'Sending...'
-                      : 'Send Feedback'),
-              style: FilledButton.styleFrom(
-                backgroundColor: _isSent ? Colors.green : null,
-              ),
+                  : const Icon(Icons.send),
+              label: Text(_isSending ? 'Opening Email...' : 'Send Feedback'),
             ),
             const SizedBox(height: 8),
             TextButton(

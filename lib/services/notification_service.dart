@@ -20,7 +20,10 @@ class NotificationService {
 
     tz_data.initializeTimeZones();
     final timezoneInfo = await FlutterTimezone.getLocalTimezone();
-    final timezoneName = timezoneInfo.identifier;
+    var timezoneName = timezoneInfo.identifier;
+    if (timezoneName == 'Asia/Calcutta') {
+      timezoneName = 'Asia/Kolkata';
+    }
     tz.setLocalLocation(tz.getLocation(timezoneName));
 
     const androidSettings =

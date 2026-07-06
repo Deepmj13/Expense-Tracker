@@ -90,6 +90,7 @@ class TransactionsView extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String?>(
+                      isExpanded: true,
                       value: filter.category,
                       decoration: InputDecoration(
                         labelText: 'Category',
@@ -117,6 +118,7 @@ class TransactionsView extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: DropdownButtonFormField<TransactionType?>(
+                      isExpanded: true,
                       value: filter.type,
                       decoration: InputDecoration(
                         labelText: 'Type',
