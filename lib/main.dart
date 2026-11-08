@@ -6,6 +6,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'core/themes/app_theme.dart';
 import 'providers/app_providers.dart';
 import 'services/database_service.dart';
+import 'services/export_service.dart';
+import 'services/export_storage_service.dart';
 import 'services/notification_service.dart';
 import 'services/sms_background_sync_service.dart';
 import 'services/sms_sync_preference_service.dart';
@@ -25,6 +27,8 @@ Future<void> main() async {
     debugPrint('Failed to initialize database: $e');
   }
 
+  await _cleanupExpiredExports();
+
   try {
     await NotificationService.instance.init();
   } catch (e) {
@@ -39,6 +43,18 @@ Future<void> main() async {
   }
 
   runApp(const ProviderScope(child: ExpenseTrackerApp()));
+}
+
+Future<void> _cleanupExpiredExports() async {
+  try {
+    final service = ExportService(
+      storage: ExportStorageService.instance,
+      database: DatabaseService(),
+    );
+    await service.startupCleanup();
+  } catch (e) {
+    debugPrint('Failed to clean up expired exports: $e');
+  }
 }
 
 Future<void> _checkAndSchedulePeriodicSync() async {

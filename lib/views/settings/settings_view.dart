@@ -1,7 +1,3 @@
-import 'dart:typed_data';
-
-import 'package:csv/csv.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -18,6 +14,7 @@ import '../../services/permission_service.dart';
 import '../../services/sms_background_sync_service.dart';
 import '../../services/transaction_parser.dart';
 import '../budget/budget_settings_sheet.dart';
+import '../export/export_sheet.dart';
 import 'feedback_sheet.dart';
 
 class SettingsView extends ConsumerWidget {
@@ -299,64 +296,10 @@ class SettingsView extends ConsumerWidget {
                   ),
                   child: const Icon(Icons.file_download, color: Colors.green),
                 ),
-                title: const Text('Export Transactions'),
-                subtitle: const Text('Save CSV file to your device'),
+                title: const Text('Export report'),
+                subtitle: const Text('CSV, XLSX, PDF or JSON'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () async {
-                  final transactions = ref.read(transactionsControllerProvider);
-
-                  final rows = [
-                    [
-                      'id',
-                      'title',
-                      'amount',
-                      'type',
-                      'category',
-                      'date',
-                      'note'
-                    ],
-                    ...transactions.map((t) => [
-                          t.id,
-                          t.title,
-                          t.amount,
-                          t.type.name,
-                          t.category,
-                          t.date.toIso8601String(),
-                          t.note,
-                        ]),
-                  ];
-
-                  final csv = const ListToCsvConverter().convert(rows);
-                  final timestamp =
-                      DateTime.now().toIso8601String().replaceAll(':', '-');
-                  final bytes = Uint8List.fromList(csv.codeUnits);
-
-                  final result = await FilePicker.platform.saveFile(
-                    dialogTitle: 'Choose save location',
-                    fileName: 'expense_export_$timestamp.csv',
-                    type: FileType.custom,
-                    allowedExtensions: ['csv'],
-                    bytes: bytes,
-                  );
-
-                  if (context.mounted) {
-                    if (result != null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('CSV saved to: $result'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Export cancelled'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
-                  }
-                },
+                onTap: () => ExportSheet.show(context),
               ),
             ],
           ),

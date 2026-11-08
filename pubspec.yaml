@@ -30,8 +30,11 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   timezone: ^0.10.0
   flutter_timezone: ^5.0.2
-  
-  
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  share_plus: ^12.0.2
+  excel: ^4.0.6
+
 
 dev_dependencies:
   flutter_test:
